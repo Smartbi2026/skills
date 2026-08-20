@@ -31,7 +31,7 @@
 ## 执行规则
 
 - 环境确定后，所有 `smartbi` 命令（`list`/`search`/`describe`/`call`/`doc`）**一律带 `--profile <name>`**，无例外、无分支判断
-- 兜底（仅一条）：若当前 CLI 版本拒绝 `--profile`（未知选项错误）→ 该命令去掉 `--profile` 重试，并一句提示："接口列表/契约按默认环境 `<active>` 获取"；`call`/`doc` 保持带 `--profile`
+- 兜底（仅一条，对旧版本 CLI）：若当前 CLI 版本拒绝 `--profile`（未知选项错误，≤1.4.0）→ 该命令去掉 `--profile` 重试，并一句提示："接口列表/契约按默认环境 `<active>` 获取"；`call`/`doc` 保持带 `--profile`
 
 ## 配置三要素流程（首次与新增统一）
 
@@ -63,6 +63,6 @@
 
 ## 版本约束与已知限制
 
-- **版本要求**：CLI 需支持全部子命令的 `--profile`。安装后验证：`smartbi list --help` 输出需包含 `--profile`
-- **已知限制**：当前 ≤1.4.0 的 CLI 仅 `call`/`doc` 支持 `--profile`，`list`/`search`/`describe` 不支持 →「执行规则」兜底生效
+- **版本要求**：CLI ≥ **1.4.1**（全部子命令 `--profile` 的最低版本）。安装后验证：`smartbi --version` ≥ 1.4.1，或 `smartbi list --help` 输出包含 `--profile`
+- **已知限制**：≤1.4.0 的 CLI 仅 `call`/`doc` 支持 `--profile`，`list`/`search`/`describe` 不支持 →「执行规则」兜底生效；1.4.1 起全部支持，兜底不再触发
 - **命名扁平**：profile 名是 config.yaml 的扁平 key，无嵌套；"环境 × 客户"维度通过命名约定 `<客户>-<环境>` 承载（如 `customerA-test`），不强制
