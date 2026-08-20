@@ -64,10 +64,3 @@ skills/
     └── scripts/              # 辅助脚本（如 Rhino 脚本注入）
 skills.json                   # 技能索引清单（浏览/工具索引用；openskills/skillslm 不读取此文件）
 ```
-
-## 开发与维护
-
-- 技能格式为 Anthropic SKILL.md：`---` frontmatter 声明 `name` / `description`，正文为执行流程
-- 多环境（profile）支持：`--profile <name>` 全命令携带，规范见 `skills/smartbi-cli/references/profiles.md`
-- 修改技能文件后，若本机 Claude Code 已安装旧副本，需同步：`cp -r skills/smartbi-cli ~/.claude/skills/`
-- CLI 依赖：`npm install -g @smartbi/cli@latest`（要求支持全子命令 `--profile`，当前 1.4.0 仅 `call`/`doc` 支持，见 `references/profiles.md`「版本约束与已知限制」）
