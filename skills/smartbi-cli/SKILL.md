@@ -26,21 +26,32 @@ description: Smartbi BI 业务操作入口：AI 对话分析（大模型问数�
 
 ### CLI 安装与配置
 
-- MUST 仅通过 **npm 全局安装** 获得可执行命令 `smartbi`：`npm install -g @smartbi/cli@latest`，随后 `smartbi --version` 验证版本 ≥ 1.2.0。
+- MUST 仅通过 **npm 全局安装** 获得可执行命令 `smartbi`：`npm install -g @smartbi/cli@latest`，随后 `smartbi --version` 验证版本，并执行 `smartbi list --help` 确认输出包含 `--profile`（多环境功能的最低版本要求；低于支持版本时按 `references/profiles.md`「版本约束与已知限制」兜底）。
 - MUST NOT 使用 `yarn` / `pnpm` / `bun` / `npx` 或其它程序代替上述 `smartbi`。
 - 初始化 MUST：`smartbi init`（或 `smartbi init --tmpl` 获取占位符模板），再按 `references/init.md` 补齐配置；不得跳过 init 手写。
-- 配置文件路径：默认 **`~/.smartbi/config.yaml`**，或用户在 init 后 **明确指定** 的 `--config <path>`。MUST NOT 在系统中猜测或套用其它文件。
+- 配置文件路径：默认 **`~/.smartbi/config.yaml`**，或用户在 init 后 **明确指定** 的 `--config <path>`。MUST NOT 在系统中猜测或套用其它文件。config.yaml 可包含多个环境（profiles），默认环境由 `profile:` 字段指定；多环境的选择、配置与错误处理见 `references/profiles.md`。
 - CLI 不存在时的处理流程见 `references/init.md`「标准安装」。
 
-### 自动补齐配置
+### 环境选择（多 profile）
 
-在首次运行 `smartbi`（任意子命令）时，若检测到 `baseUrl`/`token` 缺失，MUST 分步向用户索要（一次一个问题），全部获取后后台生成配置文件：
+任务开始时确定本次操作环境并**告知一次**（"本次操作环境：`<name>`"）：用户指定环境/客户时按 `references/profiles.md` 匹配或新建，未指定时用默认环境（config.yaml 的 `profile:` 字段）。
 
-1. **先问 Smartbi 地址**：用户提供 → `serverType: smartbi`；用户无法提供 → 询问是否用 SDK Server 地址替代（`serverType: sdk-server`）；仍无法提供 → 暂停。
-2. **再问个人令牌**：用户提供后，执行 `smartbi init --tmpl` 获取占位符模板 → 替换 `{{BASE_URL}}`、`{{TOKEN}}`、`{{SERVER_TYPE}}` → 写入 `~/.smartbi/config.yaml`。仅告知用户"配置已写入"，不展示文件内容。
-3. `serverType` 取值约束（MUST）：只能是 `sdk-server` 或 `smartbi`，不得使用其他变体。
+环境确定后，**所有** `smartbi` 命令（`list`/`search`/`describe`/`call`/`doc`）**一律带 `--profile <name>`**；CLI 版本不支持时按 `references/profiles.md`「执行规则」兜底。
 
-详细流程与替换规则见 `references/init.md`「生成配置文件」。
+完整规范（确定/告知/配置/错误处理/版本约束）见 `references/profiles.md`。
+
+### 首次配置
+
+在首次运行 `smartbi`（任意子命令）时，若检测到无配置文件或 `baseUrl`/`token` 缺失，MUST 分步向用户索要（一次一个问题），全部获取后后台生成配置文件：
+
+1. **先问地址**：用户提供 Smartbi 地址 → `serverType: smartbi`；用户无法提供 → 问 SDK Server 地址 → `serverType: sdk-server`；均无法提供 → 暂停。
+2. **再问令牌**：用户提供后，若环境名仍未确定，最后问名字（"不填则默认 dev"）。
+3. 执行 `smartbi init --tmpl` 获取占位符模板 → 替换 `{{SERVER_TYPE}}`、`{{BASE_URL}}`、`{{TOKEN}}`，并把模板中 `profile:` 字段与 `profiles` 下的键改为确认的环境名 → 写入 `~/.smartbi/config.yaml`（该环境同时为默认环境）。仅告知用户"配置已写入"，不展示文件内容。
+4. 告知本次操作环境："本次操作环境：`<name>`"。
+
+`serverType` 取值约束（MUST）：只能是 `sdk-server` 或 `smartbi`，不得使用其他变体。
+
+新增环境（追加写入、不动默认环境）的流程见 `references/profiles.md`「配置三要素流程」。详细提问模板见 `references/init.md`。
 
 ### 参数构造规范
 
@@ -111,7 +122,7 @@ description: Smartbi BI 业务操作入口：AI 对话分析（大模型问数�
 ## Phase 1 — Discover
 
 ```
-smartbi list --agent
+smartbi list --profile <name> --agent
 ```
 
 1. 默认先执行 `smartbi list --agent`，将候选全集交给大模型做语义重排。
@@ -131,7 +142,7 @@ Phase 1 定位约束（MUST）：
 ## Phase 2 — Contract
 
 ```
-smartbi describe <operationKey> --agent
+smartbi describe <operationKey> --profile <name> --agent
 ```
 
 消费字段：`callParameterPlan`、`requestBodySchema`、`consumes/produces`、`suggestedCall`。
@@ -161,8 +172,9 @@ MUST NOT 忽略链接或自行猜测文档内容。细节见 `references/describ
 ## Phase 3 — Execute
 
 ```
-smartbi call <operationKey> -d @body.json --agent
+smartbi call <operationKey> -d @body.json --profile <name> --agent
 ```
+（`<name>` 为本次操作环境；所有命令一律带 `--profile`，见全局约定「环境选择」）
 
 - 参数构造、请求体格式、临时文件清理等底层规则见 [全局约定 · 参数构造规范](#参数构造规范)
 - 前置参数依赖的子任务机制见 [全局约定 · 子任务机制](#子任务机制)
@@ -208,6 +220,7 @@ smartbi call <operationKey> -d @body.json --agent
 | `NETWORK_TIMEOUT` / `NETWORK_ERROR` | 服务不可达 | 检查 `baseUrl` 是否正确，网络是否通 |
 | `UPSTREAM_UNAVAILABLE` (503) | Smartbi 服务未启动或过载 | 确认服务状态后重试 |
 | `Config file not found` (INVALID_ARGUMENT) | 配置文件不存在 | → Phase 0 init 流程 |
+| `PROFILE_NOT_FOUND` | 指定的环境不存在 | 列出现有环境让用户选择，或按 `references/profiles.md` 新建 |
 | `SpecRejected` / `path not in spec` | sdk-server 路径前缀错误 | 确认 `serverType` 与 `baseUrl` 配置一致 |
 
 ### API 业务类
@@ -227,6 +240,7 @@ smartbi call <operationKey> -d @body.json --agent
 | 文件 | 内容 |
 |------|------|
 | `references/init.md` | 安装与配置 |
+| `references/profiles.md` | 多环境（profile）规范：确定/告知/配置/错误处理 |
 | `references/discovery.md` | Phase 1 接口发现 |
 | `references/describe.md` | Phase 2 契约理解 |
 | `references/call.md` | Phase 3 执行调用 |
