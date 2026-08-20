@@ -7,7 +7,7 @@
 ## 命令形式
 
 ```bash
-smartbi describe <operationKey> [--json] [--yaml] [--agent] [--include-raw-schema] [--refresh] [--config <path>]
+smartbi describe <operationKey> [--profile <name>] [--json] [--yaml] [--agent] [--include-raw-schema] [--refresh] [--config <path>]
 ```
 
 
@@ -18,6 +18,7 @@ smartbi describe <operationKey> [--json] [--yaml] [--agent] [--include-raw-schem
 | `--agent`              | 默认成功 `stdout` 为 YAML，失败时 `stderr` 必须输出结构化 JSON；成功体可含 Agent 侧重字段（见下节） |
 | `--include-raw-schema` | 附加 `requestBodySchemaRaw`、`responseSchemaRaw`（保留 OpenAPI 侧 `$ref` 等，供调试） |
 | `--refresh`            | 强制刷新 registry 缓存                                                         |
+| `--profile <name>`     | 环境名；**所有命令一律带**（环境选择见 `references/profiles.md`）                     |
 | `--config`             | 配置文件路径                                                                   |
 
 

@@ -29,7 +29,7 @@ smartbi call <operationKey> [选项...] [--json|--yaml|--agent]
 
 | 选项                      | 说明                          |
 | ----------------------- | --------------------------- |
-| `--profile <name>`      | 使用配置中的指定 profile            |
+| `--profile <name>`      | 环境名；**所有命令一律带**（环境选择见 `references/profiles.md`） |
 | `-d, --data <json>`     | JSON 请求体；**必须**使用 `-d @file.json`（将 JSON 写入文件后传入 @ 路径） |
 | `-F, --form <k=v\|k=@file>` | multipart 字段（可重复）      |
 | `--path <k=v>`          | 路径参数（可重复）                   |

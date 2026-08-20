@@ -15,6 +15,7 @@
 - `--with-root-version`：在顶层结果中附加 `rootVersion`。
 - `--refresh`：本次强制刷新 registry 缓存，优先级高于配置中的 `checkIntervalSeconds`。
 - `--config <path>`：指定配置文件路径（默认 `~/.smartbi/config.yaml`）。
+- 环境确定后，`list`/`search` 一律带 `--profile <name>`；CLI 版本不支持时去掉并提示（见 `references/profiles.md`「执行规则」）。
 
 ## `smartbi list`
 
