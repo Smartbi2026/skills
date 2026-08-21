@@ -53,6 +53,22 @@ cp -r skills/smartbi-cli ~/.claude/skills/
 
 安装后：在任何 Claude Code 会话中描述 Smartbi 业务操作（如"帮我训练模型资源A""分析去年销售额"）即会自动触发该技能。
 
+## 更新
+
+发布新版本（更新本仓库并 push）后，已安装用户按安装方式更新：
+
+| 安装方式 | 更新命令 |
+|---|---|
+| OpenSkills | `npx openskills update smartbi-cli`（更新全部：`npx openskills update`） |
+| SkillsLM | `npx skillslm update Smartbi2026/skills` |
+| 手动安装 | `git pull` 后重新 `cp -r skills/smartbi-cli ~/.claude/skills/` |
+
+说明：
+
+- `update` 从安装时记录的来源重新拉取最新内容并覆盖，无需卸载重装
+- 手动复制安装的技能没有来源记录，`npx openskills update` 会跳过它——先执行一次 `npx openskills install` 即可启用后续自动更新
+- `npx` 工具本身每次运行都使用 npm 最新版，无需单独更新
+
 ## 仓库结构
 
 ```
