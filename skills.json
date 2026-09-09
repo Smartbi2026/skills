@@ -1,7 +1,7 @@
 {
   "name": "smartbi-skills",
   "description": "Smartbi BI 业务操作技能集（Anthropic SKILL.md 格式）",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "source": "https://github.com/Smartbi2026/skills",
   "skills": [
     {

@@ -7,7 +7,7 @@
 ## 安装与配置边界（MUST，禁止自由发挥）
 
 - **唯一允许的获取方式**：使用下方 **标准安装** 中的命令，通过 **npm** 全局安装 `**@smartbi/cli@latest`**，得到可在 PATH 中调用的 `smartbi`。
-- **最低版本要求**：`smartbi` 版本 MUST >= `1.1.0`（`--tmpl` 占位符模板的最低版本）。安装后必须执行 `smartbi --version` 验证版本。若版本低于 1.1.0，必须重新执行 `npm install -g @smartbi/cli@latest` 升级。
+- **最低版本要求**：`smartbi` 版本 MUST >= `2.0.0`（profile 命令族与 init/profile add 写盘的最低版本）。安装后必须执行 `smartbi --version` 验证版本。若版本低于 2.0.0，必须重新执行 `npm install -g @smartbi/cli@latest` 升级。
 - MUST NOT 使用 `yarn` / `pnpm` / `bun` / `npx` 等替代上述 **npm 全局安装** 作为本 skill 的默认安装路径（避免版本漂移与不可审计环境）。
 - MUST NOT 调用项目目录内随意脚本、其它产品 CLI、或路径/名称相近的可执行文件冒充 `smartbi`。
 - **配置文件唯一来源**：安装并执行 `smartbi init` 后，使用默认路径 `**~/.smartbi/config.yaml`**（或你明确使用且与 init 产物一致的 `--config` 路径）。MUST NOT 从全盘、用户主目录或其它产品中“找一个长得像的配置文件”复制或 `--config` 指向。
@@ -40,7 +40,7 @@ smartbi --version
 
 要求：
 
-- `smartbi` 版本 MUST >= `1.1.0`
+- `smartbi` 版本 MUST >= `2.0.0`
 - Node.js `>=18`
 - 默认配置文件：`~/.smartbi/config.yaml`
 
@@ -51,41 +51,30 @@ smartbi --version
 ### 首次配置（无配置文件时）
 
 1. 按「缺项时固定提问模板」收集三要素（一次一个问题）。
-2. 执行 `smartbi init --tmpl`，将 stdout 内容读取到内存（MUST NOT 展示模板内容给用户）。
-3. 精确替换占位符（模板使用 `{{PLACEHOLDER}}` 语法）：
+2. 执行 `smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`）。默认字面量存储；若用户选择「环境变量」→ 改用 `--token-env <VAR>`（提醒用户该环境变量后续需保持可用）；「系统钥匙串」→ 改用管道形式：`echo -n '<令牌>' | smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token-keyring --token-stdin [--profile <环境名>]`（agent 无交互终端，必须带 `--token-stdin`；裸 `--token-keyring` 会失败并提示补值方式）。
+3. CLI 原子写盘 `~/.smartbi/config.yaml`（该环境同时为默认环境）。stderr 的 "prefer tokenEnv or keyring" 提示属正常输出。
+4. 不向用户展示配置文件路径与内容；直接告知本次操作环境（见 `references/profiles.md`「环境确定」）。
 
-   | 占位符 | 替换为 |
-   |--------|--------|
-   | `{{SERVER_TYPE}}` | `smartbi` 或 `sdk-server` |
-   | `{{BASE_URL}}` | 用户提供的地址 |
-   | `{{TOKEN}}` | 用户提供的令牌 |
-
-   并将模板中 `profile: dev` 与 `profiles` 下的键 `dev` 一并改为确认的环境名。
-
-   约束：
-   - MUST 精确匹配占位符文本（含双花括号），不做模糊搜索。
-   - 除环境名外，不修改 `timeoutMs`、`registry` 等其他配置。
-4. 将替换后的内容写入 `~/.smartbi/config.yaml`（父目录不存在时创建）。该环境同时为默认环境。写入后告知用户"配置已写入 `~/.smartbi/config.yaml`"并告知本次操作环境，不展示文件内容。
+存储方式的说明已含于「缺项时固定提问模板」第二步的令牌问询话术内，写入后不要再重复询问。
 
 ### 新增环境（已有配置文件时）
 
 1. 按「缺项时固定提问模板」收集三要素（一次一个问题）。
-2. 执行 `smartbi init --tmpl` 获取占位模板，替换 `{{SERVER_TYPE}}`/`{{BASE_URL}}`/`{{TOKEN}}` 后，取出 `profiles` 下的单个环境块，键改为新环境名。
-3. 将该块**追加**到现有 config.yaml 的 `profiles` 下。
-4. MUST NOT 修改现有 `profile:` 字段与其他环境。
-5. 写入后告知："环境 `<name>` 已配置 ✓"，不展示文件内容。
+2. 执行 `smartbi profile add <name> --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌>`（默认环境保持不变）。用户选择「环境变量」→ 以 `--token-env <VAR>` 替代 `--token`（提醒该环境变量后续需保持可用）；「系统钥匙串」→ 管道形式：`echo -n '<令牌>' | smartbi profile add <name> --server-type <sdk-server|smartbi> --base-url <地址> --token-keyring --token-stdin`。
+3. 需要新环境成为默认时——先经用户确认，再执行 `smartbi profile set-default <name>`。
+4. 写入后告知："环境 `<name>` 已配置 ✓"，不展示文件内容。存储方式的说明已含于令牌问询话术（「缺项时固定提问模板」第二步），写入后不要再重复询问。
 
 ### 配置字段说明
 
 - **`baseUrl`**：Smartbi 或 SDK Server 的根 URL。用户提供 Smartbi 地址（如 `http://127.0.0.1:8080/smartbi`）→ `serverType: smartbi`；用户提供 SDK Server 地址（如 `http://127.0.0.1:8086`）→ `serverType: sdk-server`。
-- **`token`**：Smartbi 个人令牌（可登录 Smartbi，在个人中心申请）。
+- **`token`**：Smartbi 个人令牌（可登录 Smartbi，在个人中心申请）。token 存储三选一（schema 互斥，只能配其一）：`token` 字面量（默认）/ `tokenEnv`（环境变量名）/ `tokenKeyring: true`（系统钥匙串，service=smartbi-cli、account=profile 名）。
 - **`serverType`**：只能为 `sdk-server` 或 `smartbi` 两个值之一，不得使用其他变体（如 `Smartbi`、`smartbi-server`、`sdk_server` 等）。
 
 约束：
 - 不得臆造配置值；缺失时必须先向用户提问并等待补齐。
-- 用自然语言提问，不要暴露 `baseUrlEnv` / `tokenEnv` 等内部技术术语。
-- 写入后仅告知用户"配置已写入 `~/.smartbi/config.yaml`"。MUST NOT 向用户建议改为环境变量方式。
-- **环境名**（`profile:` 字段与 `profiles.<name>` 键）：由用户确认；用户未提供线索时最后问（"不填则默认 dev"）。
+- 用自然语言提问，不要暴露 `baseUrlEnv` / `tokenEnv` 等配置键名；如需提及更安全的存储方式，用「环境变量 / 系统钥匙串」的口语表述（存储说明见「缺项时固定提问模板」第二步）。
+- 写入后不向用户透露配置文件路径，只确认环境名即可。
+- **环境名**：由用户确认；用户未提供线索时最后问（"不填则默认 dev"）。
 
 ### 缺项时固定提问模板（MUST）
 
@@ -103,12 +92,12 @@ smartbi --version
   - 用户提供 SDK Server 地址 → `serverType` 设为 `sdk-server`
   - 用户仍无法提供 → 暂停，等待用户找到地址后再继续
 - 高级用户可直接说 `sdkserver: http://xxx` → `serverType` 直接设为 `sdk-server`，跳过上述流程
-- 两项都拿到后，按上方「生成配置文件」流程在后台生成并写入 `~/.smartbi/config.yaml`，告知用户"配置已写入"
+- 两项都拿到后，按上方「生成配置文件」流程在后台生成配置，不向用户展示配置细节
 
 **第二步——再问令牌：**
 
 ```text
-已记录服务器地址。请提供 Smartbi 个人令牌（可登录 Smartbi，在个人中心申请）。
+已记录服务器地址。请提供 Smartbi 个人令牌（可登录 Smartbi，在个人中心申请）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储。
 ```
 
 在你补齐前，我会先暂停，不会继续调用 smartbi 命令。
@@ -134,6 +123,9 @@ profiles:
     token: "your-api-token"
     allowPlainToken: true
     timeoutMs: 300000
+    # 可选替代（三选一，勿与 token 并存）：
+    # tokenEnv: SMARTBI_TOKEN_DEV
+    # tokenKeyring: true
 registry:
   source: remote
   checkIntervalSeconds: 300

@@ -9,7 +9,7 @@
 1. **用户只感知一个环境**：任务开始时确定并告知一次，之后全程静默
 2. **配置 = 三要素**：地址、令牌、名字；首次与新增共用同一套提问
 3. **执行零分支**：所有 `smartbi` 命令一律带 `--profile <name>`
-4. **不动默认环境**：不修改 config.yaml 的 `profile:` 字段，不引导用户修改
+4. **不动默认环境**：新增环境不带 `--set-default`；用户明确要求切换默认时用 `smartbi profile set-default <name>`
 5. **向后兼容**：用户未指定环境时走默认环境，行为与单环境时代一致
 
 ## 环境确定
@@ -30,8 +30,7 @@
 
 ## 执行规则
 
-- 环境确定后，所有 `smartbi` 命令（`list`/`search`/`describe`/`call`/`doc`）**一律带 `--profile <name>`**，无例外、无分支判断
-- 兜底（仅一条，对旧版本 CLI）：若当前 CLI 版本拒绝 `--profile`（未知选项错误，≤1.4.0）→ 该命令去掉 `--profile` 重试，并一句提示："接口列表/契约按默认环境 `<active>` 获取"；`call`/`doc` 保持带 `--profile`
+- 环境确定后，所有 `smartbi` 命令（`list`/`search`/`describe`/`call`/`doc`）**一律带 `--profile <name>`**
 
 ## 配置三要素流程（首次与新增统一）
 
@@ -41,28 +40,27 @@
 
 1. **名字**：用户已提供环境线索（如"客户A的测试环境"）→ 确认名字；未提供 → 先跳过
 2. **地址**：提供 Smartbi 地址 → `serverType: smartbi`；无法提供 → 问 SDK Server 地址 → `serverType: sdk-server`；均无法提供 → 暂停
-3. **令牌**：Smartbi 个人令牌
+3. **令牌**：问令牌时一并说明存储方式（仅一句）："请提供 Smartbi 个人令牌（可登录 Smartbi，在个人中心申请）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储。"
 4. **名字（兜底）**：仍未确定时问："这个环境叫什么名字？（不填则默认 dev）"
 
-写入方式：执行 `smartbi init --tmpl` 取占位模板 → 替换 `{{SERVER_TYPE}}`/`{{BASE_URL}}`/`{{TOKEN}}` → 构造 `profiles.<name>` 块：
+写入方式：
 
-| 场景 | 写入 | `profile:` 默认环境 |
+| 场景 | 命令 | `profile:` 默认环境 |
 |------|------|-------------------|
-| 首次（无配置文件） | 新建 `profiles.<name>` | 设为 `<name>` |
-| 新增 | 追加 `profiles.<name>` | 不动 |
+| 首次（无配置文件） | `smartbi init --server-type <sdk-server\|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`） | CLI 自动设为该环境 |
+| 新增 | `smartbi profile add <name> --server-type <sdk-server\|smartbi> --base-url <地址> --token <令牌>`（创建时即预期为新默认，直接加 `--set-default`） | 不动（需要成为默认时，经用户确认后执行 `smartbi profile set-default <name>`，无需重建） |
 
-完成后告知："环境 `<name>` 已配置 ✓"，并按「环境确定」告知本次操作环境。
+完成后告知："环境 `<name>` 已配置 ✓"，并按「环境确定」告知本次操作环境。存储方式的说明已含于第 3 步令牌问询话术内，写入后不要重复询问。
 
 ## 错误处理
 
 | 错误 | 处理 |
 |------|------|
-| `PROFILE_NOT_FOUND` | 读 config.yaml 列出现有环境 → 用户选择，或走「配置三要素」新建 |
-| `AUTH_FAILED` | 提示"`<name>` 环境的 token 无效或已过期"，请用户确认该环境凭证 |
+| `PROFILE_NOT_FOUND` | `smartbi profile list` 列出现有环境 → 用户选择，或走「配置三要素」新建 |
+| `AUTH_FAILED` | 提示"`<name>` 环境的 token 无效或已过期"；执行 `smartbi profile show <name>` 查看凭证来源（env/keyring/字面量）与可用性，请用户确认该环境凭证 |
 | 其他 | 按 SKILL.md Phase 4 通用诊断，报告本次调用所用环境 |
 
-## 版本约束与已知限制
+## 版本约束
 
-- **版本要求**：CLI ≥ **1.4.1**（全部子命令 `--profile` 的最低版本）。安装后验证：`smartbi --version` ≥ 1.4.1，或 `smartbi list --help` 输出包含 `--profile`
-- **已知限制**：≤1.4.0 的 CLI 仅 `call`/`doc` 支持 `--profile`，`list`/`search`/`describe` 不支持 →「执行规则」兜底生效；1.4.1 起全部支持，兜底不再触发
-- **命名扁平**：profile 名是 config.yaml 的扁平 key，无嵌套；"环境 × 客户"维度通过命名约定 `<客户>-<环境>` 承载（如 `customerA-test`），不强制
+- **版本要求**：CLI ≥ **2.0.0**（profile 命令族与 init/profile add 写盘的最低版本）。安装后验证：`smartbi --version` ≥ 2.0.0，或 `smartbi profile list --help` 可用；低于 2.0.0 时按 `references/init.md`「标准安装」升级
+- **命名规则**：profile 名仅允许 `[A-Za-z0-9_-]`；"环境 × 客户"维度通过命名约定 `<客户>-<环境>` 承载（如 `customerA-test`），不强制

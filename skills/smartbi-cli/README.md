@@ -43,10 +43,12 @@ SKILL.md                         ← 入口（agent 加载）
 ├─ Part 2: Scenario Guides（索引）  ← 按意图路由，命中后加载对应文件
 │
 ├─ scenarios/                    ← 场景文件（每个独立验证）
-│   └─ schedule-task.md          S1 定时计划任务
+│   ├─ schedule-task.md          S1 定时计划任务
+│   └─ push-message.md           S2 消息推送
 │
 └─ references/                   ← 参考手册（按需加载）
     ├─ init.md                   安装与配置
+    ├─ profiles.md               多环境（profile）规范
     ├─ discovery.md              Phase 1 详细流程
     ├─ describe.md               Phase 2 详细流程
     ├─ call.md                   Phase 3 详细流程
@@ -66,7 +68,7 @@ SKILL.md                         ← 入口（agent 加载）
 
 ## 依赖
 
-- **npm 包**：`@smartbi/cli >= 1.1.0`（`npm install -g @smartbi/cli@latest`）
+- **npm 包**：`@smartbi/cli >= 2.0.0`（`npm install -g @smartbi/cli@latest`）
 - **外部 skill**：**零**。本 skill 自闭环，不依赖任何其他 skill。
 
 ## 使用说明
@@ -75,8 +77,9 @@ SKILL.md                         ← 入口（agent 加载）
 
 ```bash
 npm install -g @smartbi/cli@latest
-smartbi --version   # 确认 >= 1.1.0
-smartbi init        # 生成 ~/.smartbi/config.yaml，按提示填入 baseUrl + token
+smartbi --version   # 确认 >= 2.0.0
+smartbi init --server-type <sdk-server|smartbi> --base-url <url> --token <token>
+                    # 全参数生成 ~/.smartbi/config.yaml
 ```
 
 ### 在 Agent 中使用
@@ -125,9 +128,11 @@ smartbi-cli/
 ├── README.md                    ← 本文件
 ├── SKILL.md                     ← skill 入口（agent 加载）
 ├── scenarios/                   ← 已验证场景
-│   └── schedule-task.md         S1 定时计划任务
+│   ├── schedule-task.md         S1 定时计划任务
+│   └── push-message.md          S2 消息推送
 └── references/                  ← 参考手册
     ├── init.md
+    ├── profiles.md
     ├── discovery.md
     ├── describe.md
     ├── call.md
