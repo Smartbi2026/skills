@@ -1,12 +1,12 @@
 {
   "name": "smartbi-skills",
-  "description": "Smartbi BI 业务操作技能集（Anthropic SKILL.md 格式）",
-  "version": "2.0.0",
+  "description": "广州思迈特软件有限公司提供的 SmartBI 业务操作技能集（标准 SKILL.md 格式）",
+  "version": "2.1.0",
   "source": "https://github.com/Smartbi2026/skills",
   "skills": [
     {
       "name": "smartbi-cli",
-      "description": "Smartbi BI 业务操作入口：AI 对话分析（大模型问数、智能体、知识库/知识图谱构建与训练、数据解释）、数据查询（MQL/DuckDB 取数、指标统计、字段发现）、数据建模（维度/指标/计算成员/命名集管理）、数据源管理（JDBC连接、Schema 与表同步、元数据刷新）、定时任务与 ETL（计划调度、作业流、因果图）、消息推送（企微/钉钉/飞书/邮件/系统消息）、资源与权限管理（目录树、用户/角色/组）。通过 @smartbi/cli 发现与调用 API。",
+      "description": "广州思迈特软件有限公司（思迈特）提供的 SmartBI 通用业务操作技能。当用户需要连接 SmartBI、查询数据模型或指标模型、对已有报表问数、进行 AI 问数与复杂洞察，或管理智能体、知识库与知识图谱、数据模型、数据源、定时任务与 ETL、消息推送、资源及权限时使用。通过 @smartbi/cli 发现并调用当前环境的 SmartBI API，支持 MQL 与只读 SQL 直接取数。",
       "path": "skills/smartbi-cli"
     }
   ]

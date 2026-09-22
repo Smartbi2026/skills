@@ -1,12 +1,14 @@
-# Smartbi Skills
+# SmartBI Skills
 
-Smartbi BI 业务操作技能集（[Anthropic SKILL.md](https://docs.anthropic.com/claude/docs/skills) 格式），通过 `@smartbi/cli` 发现与调用 Smartbi API。
+广州思迈特软件有限公司（思迈特）提供的 SmartBI 业务操作技能集，采用标准 `SKILL.md` 格式，通过 `@smartbi/cli` 发现与调用当前环境开放的 SmartBI API。
+
+当前 Skill 版本：**2.1.0**。`@smartbi/cli >= 2.0.0` 是独立的命令行依赖版本。详细变更见 [更新日志](CHANGELOG.md)。
 
 ## 技能列表
 
 | 技能 | 说明 |
 |------|------|
-| [smartbi-cli](skills/smartbi-cli/SKILL.md) | Smartbi BI 业务操作入口：AI 对话分析（大模型问数、智能体、知识库/知识图谱构建与训练、数据解释）、数据查询（MQL/DuckDB 取数、指标统计、字段发现）、数据建模（维度/指标/计算成员/命名集管理）、数据源管理（JDBC连接、Schema 与表同步、元数据刷新）、定时任务与 ETL（计划调度、作业流、因果图）、消息推送（企微/钉钉/飞书/邮件/系统消息）、资源与权限管理（目录树、用户/角色/组） |
+| [smartbi-cli](skills/smartbi-cli/SKILL.md) | SmartBI 通用业务操作入口。新增模型取数路径及已有报表的资源定位、元数据读取和结果校验；保留原有通用 API、定时任务、消息推送、数据建模、数据源及资源权限管理能力。实际可用接口和数据范围取决于部署版本、模型定义和账号权限。 |
 
 ## 安装
 
@@ -51,7 +53,7 @@ git clone https://github.com/Smartbi2026/skills.git
 cp -r skills/smartbi-cli ~/.claude/skills/
 ```
 
-安装后：在任何 Claude Code 会话中描述 Smartbi 业务操作（如"帮我训练模型资源A""分析去年销售额"）即会自动触发该技能。
+安装后：在任何 Claude Code 会话中描述 SmartBI 业务操作（如"帮我训练模型资源A""分析去年销售额"）即会自动触发该技能。
 
 ## 更新
 
