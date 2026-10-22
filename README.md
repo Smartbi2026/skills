@@ -2,7 +2,7 @@
 
 广州思迈特软件有限公司（思迈特）提供的 SmartBI 业务操作技能集，采用标准 `SKILL.md` 格式，通过 `@smartbi/cli` 发现与调用当前环境开放的 SmartBI API。
 
-当前 Skill 版本：**2.1.0**。`@smartbi/cli >= 2.0.0` 是独立的命令行依赖版本。详细变更见 [更新日志](CHANGELOG.md)。
+当前 Skill 版本：**2.2.0**。`@smartbi/cli >= 2.2.0` 是独立的命令行依赖版本。详细变更见 [更新日志](CHANGELOG.md)。
 
 ## 技能列表
 
@@ -78,7 +78,7 @@ skills/
 └── smartbi-cli/
     ├── SKILL.md              # 技能主文件（流程骨架：Scenario Router → Discover → Contract → Execute → Diagnose）
     ├── references/           # 按需加载的参考：init（安装配置）、profiles（多环境）、call、describe、discovery、strategy 等
-    ├── scenarios/            # 高频业务场景端到端模板（定时任务、消息推送）
-    └── scripts/              # 辅助脚本（如 Rhino 脚本注入）
+    ├── scenarios/            # 高频业务场景端到端模板（定时任务、消息推送、数据查询与洞察）
+    └── scripts/              # 辅助脚本（Rhino 脚本注入、文件与白泽会话工具）
 skills.json                   # 技能索引清单（浏览/工具索引用；openskills/skillslm 不读取此文件）
 ```

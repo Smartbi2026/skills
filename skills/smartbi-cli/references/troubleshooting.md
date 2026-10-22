@@ -65,7 +65,7 @@ Only now inspect the actual sandbox command, model/table/field names, filters, g
 
 ## Result or presentation failure
 
-HTTP 200, round `NORMAL`, or a generated file does not prove correctness. Check result rows, business grain, totals, expected artifacts, and any visual/layout QA required by the task.
+CLI exit code `0` already means HTTP 2xx with no top-level `success: false`; `BIZ_ERROR` (exit 4) means the CLI has identified a business failure — inspect `details.upstreamMessage` / `upstreamErrorCode` / `upstreamBodyPreview` before descending into lower layers. Even with exit `0`, HTTP 200, round `NORMAL`, or a generated file does not prove business correctness. Check result rows, business grain, totals, expected artifacts, and any visual/layout QA required by the task.
 
 ## Known query and stream symptoms
 

@@ -35,7 +35,7 @@ smartbi call <operationKey> --profile <name> [选项...] [--json|--yaml|--agent]
 | `--path <k=v>`          | 路径参数（可重复）                   |
 | `--query <k=v>`         | 查询参数（可重复）                   |
 | `--header <k=v>`        | 请求头（可重复）                    |
-| `--timeout <ms>`        | 超时（毫秒）                      |
+| `--timeout <ms>`        | 单次请求超时（纯十进制正整数，覆盖 profile 的 `timeoutMs`；连接建立阶段超时固定约 10s，不受此值控制） |
 | `--dry-run`             | 仅打印请求预览，不发送网络请求             |
 | `--idempotent`          | 允许对**写请求**按策略自动重试（须业务上可幂等）  |
 | `--stream`              | 流式响应（如 SSE）                 |

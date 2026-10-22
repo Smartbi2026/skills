@@ -69,6 +69,6 @@
   ├─ 网络类
   │   ├─ NETWORK_TIMEOUT   → baseUrl 错误或网络不通
   │   └─ NETWORK_ERROR     → DNS/代理/防火墙问题
-  └─ 业务错误（200 但 data.success=false）
-      └─ 读 data.error/data.message，对照本 skill 错误速查表
+  └─ 业务错误（HTTP 2xx 但顶层 success=false；CLI 返回 BIZ_ERROR / exit 4）
+      └─ 读 details.upstreamMessage / upstreamErrorCode / upstreamBodyPreview，对照本 skill 错误速查表
 ```
