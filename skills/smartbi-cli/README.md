@@ -1,12 +1,12 @@
 # SmartBI CLI Skill
 
-Skill 版本：**2.1.0**。运行时依赖的 `@smartbi/cli` 版本独立管理，最低要求为 2.0.0。
+Skill 版本：**2.2.0**。运行时依赖的 `@smartbi/cli` 版本独立管理，最低要求为 2.2.0。
 
 保留标准 Skill 的业务路由，为数据类请求采用基于模型的直接取数路径：用户问句 → 读取必要模型信息 → 根据模型与 SDK 能力选择 MQL 或只读 SQL → CLI 调用 SDK → 校验数据 → 桌面智能体分析/展示。直接取数不依赖模型训练或 AI 问数，无需额外查询框架。详见 `references/query-routing.md`。
 
 在原版场景索引中新增数据查询与洞察，入口为 `scenarios/data-query.md`；原有通用 API、定时任务和推送保留。外部智能体通过接口定位资源，不依赖 SmartBI 页面预选信息。模型取数按语义选择 MQL/只读 SQL，已有报表按定义与参数查询/导出；正式报告、归因、预测和综合大屏按路由默认白泽，用户指定直接取数或本地分析时遵循其选择。已有数据制图和文件转换继续本地处理；创建或修改 SmartBI 报表仍走资源操作接口。
 
-普通取数依赖 Node/npm 全局安装的 SmartBI CLI（>=2.0.0）。Python 仅用于可选辅助脚本/文件读取，不是 MQL 前置条件。跨桌面客户端需具备命令执行和文件读写能力；不能把单一客户端的实测视为所有客户端已验证。
+普通取数依赖 Node/npm 全局安装的 SmartBI CLI（>=2.2.0）。Python 仅用于可选辅助脚本/文件读取，不是 MQL 前置条件。跨桌面客户端需具备命令执行和文件读写能力；不能把单一客户端的实测视为所有客户端已验证。
 
 支持具备命令执行和文件读写能力的桌面智能体，通过 `@smartbi/cli` 发现并调用当前环境开放且有权限的 SmartBI API。
 
@@ -80,12 +80,13 @@ SKILL.md                         ← 入口（agent 加载）
 | **S1 定时计划任务 / S2 推送** | 定时任务、脚本及消息推送指南 | 保留原场景，本轮只读验收不代表写操作已复测 |
 | **已有报表取数** | 资源发现、元数据、参数、导出与文件校验 | 按报表类型、有效参数和业务结果逐次校验 |
 | **SmartBI AI / Baize** | 按数据查询与洞察场景处理显式请求或复杂洞察 | 按需分支，不是普通直接取数前置 |
+| **浏览器授权登录** | `smartbi login`（OAuth2 + PKCE）令牌写入系统钥匙串；`smartbi logout` 服务端吊销并清理本地凭据 | 可选凭证方式，不替代默认字面令牌流程 |
 
 > 新场景按具体类型和路径完成端到端验收后才声明支持；已加入的扩展说明须保留未验证边界。
 
 ## 依赖
 
-- **npm 包**：`@smartbi/cli >= 2.0.0`（`npm install -g @smartbi/cli@latest`）
+- **npm 包**：`@smartbi/cli >= 2.2.0`（`npm install -g @smartbi/cli@latest`）
 - **外部 skill**：**零**。本 skill 自闭环，不依赖任何其他 skill。
 
 ## 使用说明
@@ -94,7 +95,7 @@ SKILL.md                         ← 入口（agent 加载）
 
 ```bash
 npm install -g @smartbi/cli@latest
-smartbi --version   # 确认 >= 2.0.0
+smartbi --version   # 确认 >= 2.2.0
 smartbi init --server-type <sdk-server|smartbi> --base-url <url> --token <token>
                     # 全参数生成 ~/.smartbi/config.yaml
 ```
@@ -161,6 +162,7 @@ smartbi-cli/
 └── references/                  ← 参考手册
     ├── query-routing.md         直接取数范围、最小路径及校验
     ├── data-model-query.md      MQL/SQL接口契约与示例
+    ├── metric-model-query.md    指标模型查询
     ├── report-query.md          已有报表定位、参数、导出与校验
     ├── artifact-handling.md     文件值保真及格式处理
     ├── sessions-and-logs.md     白泽会话与执行校验

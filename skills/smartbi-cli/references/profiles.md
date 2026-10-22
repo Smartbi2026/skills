@@ -35,7 +35,7 @@
 只对缺失的连接信息按顺序提问（一次一个）：
 
 1. **地址**：提供 SmartBI 地址 → `serverType: smartbi`；只说要连接 SmartBI 但未指定地址时，先确认是否使用官网体验中心 `https://cloud.smartbi.com.cn/smartbi`；确认后使用 `serverType: smartbi`。拒绝体验中心或无法提供地址时，再询问 SDK Server 地址 → `serverType: sdk-server`；均无法提供 → 暂停。已有有效配置时跳过此步骤。
-2. **令牌**：问令牌时一并说明获取路径和存储方式（仅一句）："请提供 SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储。"
+2. **令牌**：问令牌时一并说明获取路径和存储方式（仅一句）："请提供 SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储，或用浏览器授权登录（令牌自动存入系统钥匙串）。"
 
 首次配置省略 `--profile`，让 CLI 使用默认名。新增连接时，先从用户已给的业务名称生成合法且不冲突的内部名；没有名称则读取现有 profile 后按 `connection-2`、`connection-3` 等顺序选取首个未占用名。不得覆盖已有 profile，也不为内部名称单独打断用户。
 
@@ -45,6 +45,9 @@
 |------|------|-------------------|
 | 首次（无配置文件） | `smartbi init --server-type <sdk-server\|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`） | CLI 自动设为该环境 |
 | 新增 | `smartbi profile add <name> --server-type <sdk-server\|smartbi> --base-url <地址> --token <令牌>` | 不动（用户明确要求成为默认时执行 `smartbi profile set-default <name>`，无需重建） |
+| 浏览器授权登录 | `smartbi login --profile <name> --server-type <sdk-server\|smartbi> --base-url <地址>`（非交互创建必需这两个参数；仅支持 keyring 型 profile，授权链接在 stderr，须由用户在同机浏览器完成） | 首次创建时自动设为默认；已有配置中新建时不动 |
+
+`init` / `profile add` 均支持 `--timeout-ms <ms>`（默认 300000）；`profile add` 另支持 `--base-url-env <VAR>`（地址在调用时从环境变量读取）。
 
 完成后继续原业务请求；需要告知连接状态时说“已连接到所选 SmartBI 地址”，不展示内部名称。存储方式的说明已含于令牌问询话术内，写入后不要重复询问。
 
@@ -54,9 +57,11 @@
 |------|------|
 | `PROFILE_NOT_FOUND` | `smartbi profile list` 读取现有连接；按地址或业务名称让用户选择，或走「连接配置流程」新建，不要求用户识别内部 profile 名 |
 | `AUTH_FAILED` | 提示"`<name>` 环境的 token 无效或已过期"；执行 `smartbi profile show <name>` 查看凭证来源（env/keyring/字面量）与可用性，请用户确认该环境凭证 |
+| `Profile '<name>' does not use the system keyring`（login） | `smartbi login` 仅支持 keyring 型 profile；按 `references/init.md`「修复已有环境」处理（另建 keyring profile，或经确认后重建） |
 | 其他 | 按 SKILL.md Phase 4 通用诊断，报告本次调用所用环境 |
 
 ## 版本约束
 
-- **版本要求**：CLI ≥ **2.0.0**（profile 命令族与 init/profile add 写盘的最低版本）。安装后验证：`smartbi --version` ≥ 2.0.0，或 `smartbi profile list --help` 可用；低于 2.0.0 时按 `references/init.md`「标准安装」升级
+- **版本要求**：CLI ≥ **2.2.0**（profile 命令族、init/profile add 写盘、浏览器登录与 describe 增强字段的最低版本）。安装后验证：`smartbi --version` ≥ 2.2.0，或 `smartbi profile list --help` 可用；低于 2.2.0 时按 `references/init.md`「标准安装」升级
+- **`profile list`**：2.2.0 起输出包含 TimeoutMs 列；`profile show <name>` 可查看单个 profile 的凭证来源与可用性
 - **命名规则**：profile 名仅允许 `[A-Za-z0-9_-]`；"环境 × 客户"维度通过命名约定 `<客户>-<环境>` 承载（如 `customerA-test`），不强制

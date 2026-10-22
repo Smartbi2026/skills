@@ -1,7 +1,7 @@
 {
   "name": "smartbi-skills",
   "description": "广州思迈特软件有限公司提供的 SmartBI 业务操作技能集（标准 SKILL.md 格式）",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "source": "https://github.com/Smartbi2026/skills",
   "skills": [
     {

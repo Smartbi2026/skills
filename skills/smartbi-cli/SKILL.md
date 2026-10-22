@@ -31,7 +31,7 @@ description: 广州思迈特软件有限公司（思迈特）提供的 SmartBI �
 
 ### CLI 安装与配置
 
-- MUST 仅通过 **npm 全局安装** 获得可执行命令 `smartbi`：`npm install -g @smartbi/cli@latest`，随后 `smartbi --version` 验证版本 **≥ 2.0.0**，并执行 `smartbi profile list --help` 确认 profile 命令族可用。
+- MUST 仅通过 **npm 全局安装** 获得可执行命令 `smartbi`：`npm install -g @smartbi/cli@latest`，随后 `smartbi --version` 验证版本 **≥ 2.2.0**，并执行 `smartbi profile list --help` 确认 profile 命令族可用。
 - MUST NOT 使用 `yarn` / `pnpm` / `bun` / `npx` 或其它程序代替上述 `smartbi`。
 - 初始化 MUST：由 CLI 全参数生成配置：`smartbi init --server-type <sdk-server|smartbi> --base-url <url> --token <token> [--profile <name>]`；凭证方式按用户选择，可使用字面令牌、环境变量或钥匙串，细节见 `references/init.md`。
 - 配置文件路径：默认 **`~/.smartbi/config.yaml`**，或用户在 init 后 **明确指定** 的 `--config <path>`。MUST NOT 在系统中猜测或套用其它文件。config.yaml 可包含多个环境（profiles），默认环境由 `profile:` 字段指定；多环境的选择、配置与错误处理见 `references/profiles.md`。
@@ -50,8 +50,8 @@ description: 广州思迈特软件有限公司（思迈特）提供的 SmartBI �
 仅在无配置或所选环境缺少必要信息时补齐配置。复用已知地址、服务器类型、环境名和有效凭证来源（字面令牌、环境变量或钥匙串），只询问缺失项，一次一个问题。已有地址但缺少/失效令牌时只处理凭证，不再推荐体验中心。已有配置的修复见 `references/init.md`，不得用全量初始化覆盖其他环境。以下完整流程用于首次无配置的情况：
 
 1. **先问地址**：用户提供 SmartBI 地址 → `serverType: smartbi`。如果用户只表达“连接 SmartBI”或“连接 SmartBI 地址”但没有提供具体地址，第一问直接说：“是否连接 SmartBI 官网体验中心 https://cloud.smartbi.com.cn/smartbi？如果要连接自己的环境，请提供地址。”不得只问“要连接哪个环境”而遗漏体验中心选项；也不得在用户确认前将体验中心写入配置或发起连接。用户确认后使用该地址和 `serverType: smartbi`。用户拒绝或需要其他环境时，再询问实际 SmartBI 地址；用户无法提供 SmartBI 地址时，询问 SDK Server 地址并使用 `serverType: sdk-server`；两者均无法提供时暂停。
-2. **再问令牌**：问令牌时一并说明获取路径和存储方式（仅一句）："请提供 SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储。"首次配置不再询问环境名；若用户选择其他存储方式，步骤 3 按其选择生成。
-3. 执行 `smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`；CLI 写盘 `~/.smartbi/config.yaml`，该环境同时为默认环境）。若用户选择其他存储方式：「环境变量」→ 以 `--token-env <VAR>` 替代 `--token`；「系统钥匙串」→ agent 无交互终端，使用当前 shell 的安全 stdin 管道传入令牌，并带 `--token-keyring --token-stdin`；不要把字面令牌写进命令历史（裸 `--token-keyring` 在无 TTY 下会直接失败）。
+2. **再问令牌**：问令牌时一并说明获取路径和存储方式（仅一句）："请提供 SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。令牌默认直接存进配置；如对安全有更高要求，也可以改用「环境变量」或「系统钥匙串」存储，或用浏览器授权登录（令牌自动存入系统钥匙串）。"首次配置不再询问环境名；若用户选择其他方式，步骤 3 按其选择生成。
+3. 执行 `smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`；CLI 写盘 `~/.smartbi/config.yaml`，该环境同时为默认环境）。若用户选择其他方式：「环境变量」→ 以 `--token-env <VAR>` 替代 `--token`；「系统钥匙串」→ agent 无交互终端，使用当前 shell 的安全 stdin 管道传入令牌，并带 `--token-keyring --token-stdin`；不要把字面令牌写进命令历史（裸 `--token-keyring` 在无 TTY 下会直接失败）；「浏览器授权登录」→ 改为 `smartbi login --profile <环境名> --server-type <sdk-server|smartbi> --base-url <地址>`，授权链接会打印在 stderr，须转呈用户在**同一台机器**的浏览器中完成授权（固定回调 `127.0.0.1:24680`，端口被占用即失败；默认等待 300s，可用 `--timeout-ms` 调整）。
 4. 配置成功后继续原业务请求；仅需区分多个连接或排错时，用服务器地址或用户熟悉的名称说明当前连接，不单独展示内部 profile 名。
 
 `serverType` 取值约束（MUST）：只能是 `sdk-server` 或 `smartbi`，不得使用其他变体。
@@ -160,7 +160,9 @@ Phase 1 定位约束（MUST）：
 smartbi describe <operationKey> --profile <name> --agent
 ```
 
-消费字段：`callParameterPlan`、`requestBodySchema`、`consumes/produces`、`suggestedCall`。
+消费字段：`callParameterPlan`、`requestBodySchema`、`requestBodyTemplate`、`docLinks`、`consumes/produces`、`suggestedCall`。
+
+`schemaDefs` 默认有字节预算，被截断时输出 `schemaDefsMeta` 与 warning；需要完整定义时追加 `--schema-budget 0` 或 `--full-schema`。
 
 ### 文档加载（优先获取，不可用时兜底）
 
@@ -170,7 +172,8 @@ smartbi describe <operationKey> --profile <name> --agent
 
 | 维度 | 识别方式 | 示例 |
 |------|----------|------|
-| `description` 中的链接 | 扫描 `describe` 输出的 `description` 字段中的 Markdown 链接 | `[MQL详情](/docs/specs/datamodel/mql/mql.md)` |
+| **`docLinks`（优先）** | 直接使用 `describe --agent` 输出的 `docLinks` 字段（CLI 已从 description 与 schema 中提取），取每项的 `path` | `[{ title: "MQL详情", path: "/docs/specs/datamodel/mql/mql.md", source: "schema:MqlQuery" }]` |
+| `description` 中的链接 | `docLinks` 缺失时，扫描 `description` 字段中的 Markdown 链接作为兜底 | `[MQL详情](/docs/specs/datamodel/mql/mql.md)` |
 | `requestBodySchema` 中的链接 | 沿 `$ref` 链查找被引用 schema 的 `description` 中的链接 | schemas.yaml 中组件定义的 description |
 | domain 推断 | 根据 `operationKey` 所属 domain 推断相关文档目录 | `createDataSet` → `docs/specs/tabularmodel/` |
 | 数据类型推断 | 根据请求体中涉及的核心数据类型推断参考文档 | 含 `DataSetMeasure` → `docs/specs/tabularmodel/mdl/references/measures.md` |
@@ -233,9 +236,13 @@ smartbi call <operationKey> -d @body.json --profile <name> --agent
 | `command not found` (127) / `is not recognized` | 未安装 CLI | → Phase 0 标准安装 |
 | `AUTH_FAILED` (401) | token 无效或已过期 | 让用户重新申请令牌；用 `smartbi profile show <name>` 诊断凭证来源后更新配置 |
 | `FORBIDDEN` (403) | 用户无权限执行该 operation | 检查 `x-funcPerm` 要求，确认用户角色 |
+| `BIZ_ERROR` (exit 4) | HTTP 2xx 但响应顶层 `success:false`（`--stream` 下同） | 按 `details.upstreamMessage` / `upstreamErrorCode` / `upstreamBodyPreview` 定位业务错误；不是网络或鉴权问题 |
 | `Plain token is disabled by allowPlainToken=false`（AUTH_FAILED） | 字面量 token 被 `allowPlainToken: false` 拦截（配置通常被外部改动过） | 按 init.md 修复凭证来源；保留该 profile 的其他设置和其他环境，不擅自改为明文或覆盖初始化 |
+| `Profile '<name>' does not use the system keyring`（login） | `smartbi login` 只支持 keyring 型 profile | 另建 keyring 型 profile 后登录，或经用户确认后重建该 profile；详见 `references/init.md`「修复已有环境」 |
+| `Timed out waiting for the browser callback`（AUTH_FAILED, exit 3） | 未在超时内完成浏览器授权 | 确认用户已打开 stderr 中的授权链接且浏览器与 CLI 同机（固定回调 `127.0.0.1:24680`）；可增大 `--timeout-ms` 重试 |
+| 回环端口被占用（login） | 另一个 login 或其它程序占用了 24680 | 释放端口后重试；本期无回退端口 |
 | `KEYRING_UNAVAILABLE` | 配置了 `tokenKeyring: true` 但系统钥匙串不可用（无头/无桌面会话） | 恢复钥匙串可用性，或按用户选择更换凭证来源；遵循 init.md 保留现有配置 |
-| `NETWORK_TIMEOUT` / `NETWORK_ERROR` | 服务不可达 | 检查 `baseUrl` 是否正确，网络是否通 |
+| `NETWORK_TIMEOUT` / `NETWORK_ERROR` | 服务不可达或超时 | 检查 `baseUrl` 与网络；连接阶段超时固定约 10s（`--timeout` 不生效），响应阶段超时受 `--timeout`/`timeoutMs` 控制 |
 | `UPSTREAM_UNAVAILABLE` (503) | SmartBI 服务未启动或过载 | 确认服务状态后重试 |
 | `Config file not found` (INVALID_ARGUMENT) | 配置文件不存在 | → Phase 0 init 流程 |
 | `Config file is invalid`（INVALID_ARGUMENT，附逐条 `- 路径: 原因`） | 配置内容不合法 | 按逐条摘要修正字段，保留现有环境和自定义设置，不用重新 init 覆盖 |

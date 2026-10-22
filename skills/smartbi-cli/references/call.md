@@ -62,13 +62,17 @@ smartbi call <operationKey> --profile <name> [选项...] [--json|--yaml|--agent]
 - MUST NOT 在任务收尾后长期遗留含业务参数或可能含敏感字段的临时 JSON；优先写入系统临时目录，或仓库内已 `.gitignore` 的路径，降低误提交风险。
 - 若 `-d @` 指向的是**用户已有文件**（非本轮创建），MUST NOT 擅自删除。
 
-## 成功响应中可观测字段
+## 成功判定与观测字段
 
-自动化场景下，除 HTTP 语义外，成功 JSON 中常关注：
+2.2.0 起，**退出码 0 表示 HTTP 成功且响应顶层不是 `success: false`**。HTTP 2xx 但顶层 `success: false` 会被 CLI 转为 `BIZ_ERROR`（exit 4），`--stream` 下同样检查 SSE `data:` / NDJSON 行；自动化流程直接依赖退出码即可，不再需要自行判断 `data.success`。
+
+失败时结构化错误（`--agent` 的 stderr JSON）包含 `details.upstreamMessage`、`details.upstreamErrorCode`、`details.upstreamBodyPreview`，用于定位业务错误；这类错误不是网络或鉴权问题，不应重试。
+
+成功时通常关注：
 
 - `status`：HTTP 状态码
 - `tid`：追踪标识（若存在）
-- `data`：业务载体；失败或业务错误时可能含 `data.success`、`data.error`（与 Phase 4 诊断字段一致）
+- `data`：业务载体
 
 具体形状以当前安装 CLI 的 `smartbi call --help`、目标 operation 的 `describe` 响应和实际实现为准；Skill 不捆绑版本固定的 schema 文件。
 
@@ -78,7 +82,8 @@ smartbi call <operationKey> --profile <name> [选项...] [--json|--yaml|--agent]
 - **是否允许写请求自动重试**：仅当 `--idempotent` 传入，或 describe 元数据中 `idempotent === true`（通常来自 OpenAPI `x-idempotent`）时，写请求才可进入与读请求相同的重试路径；否则写请求 **最多尝试 1 次**。
 - **重试次数**：允许重试时，最多 **3 次** 尝试（含指数退避与抖动）。
 - **可因 HTTP 状态触发的重试**（在仍有剩余次数时）：**429**、**502**、**503**。
-- **网络类错误**：在 CLI 判定为可重试的网络超时/错误时，同样可在上述次数内退避重试。
+- **网络类错误**：在 CLI 判定为可重试的网络超时/错误时，同样可在上述次数内退避重试。连接阶段超时固定约 10s（不受 `--timeout` 控制），响应阶段超时受 `--timeout`/`timeoutMs` 控制；`--timeout` 只接受纯十进制正整数。
+- **业务错误**：`BIZ_ERROR` 不可重试。
 - **代理义务**：不得对非幂等写请求假设可安全重放；须满足主 Skill 的幂等门控后再依赖 `--idempotent` 或元数据 `idempotent`。
 
 ## 前置条件与子任务（MUST）
