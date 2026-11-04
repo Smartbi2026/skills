@@ -1,35 +1,35 @@
 # `init` / 安装与配置参考
 
-本文件为 **SmartBI CLI Skill** 的附属参考；流程性 MUST 以上级 `SKILL.md` 为准。
+本文件为 **SmartBI CLI Skill** 的附属参考；流程要求以 `SKILL.md` 为准。
 
 **用途**：仅当 skill 的惰性预检（lazy preflight）触发时，用于完成标准安装、初始化与最小可用配置。
 
-## 安装与配置边界（MUST，禁止自由发挥）
+## 安装与配置边界（必须，禁止自由发挥）
 
 - **唯一允许的获取方式**：使用下方 **标准安装** 中的命令，通过 **npm** 全局安装 `**@smartbi/cli@latest`**，得到可在 PATH 中调用的 `smartbi`。
-- **最低版本要求**：`smartbi` 版本 MUST >= `2.2.0`（profile 命令族、init/profile add 写盘、浏览器登录与 describe 增强字段的最低版本）。安装后必须执行 `smartbi --version` 验证版本。若版本低于 2.2.0，必须重新执行 `npm install -g @smartbi/cli@latest` 升级。
-- MUST NOT 使用 `yarn` / `pnpm` / `bun` / `npx` 等替代上述 **npm 全局安装** 作为本 skill 的默认安装路径（避免版本漂移与不可审计环境）。
-- MUST NOT 调用项目目录内随意脚本、其它产品 CLI、或路径/名称相近的可执行文件冒充 `smartbi`。
-- **配置文件唯一来源**：安装并执行 `smartbi init` 后，使用默认路径 `**~/.smartbi/config.yaml`**（或你明确使用且与 init 产物一致的 `--config` 路径）。MUST NOT 从全盘、用户主目录或其它产品中“找一个长得像的配置文件”复制或 `--config` 指向。
+- **最低版本要求**：`smartbi` 版本必须 ≥ `2.2.0`（本技能依赖的 CLI 2.2.0 能力基线）。安装后必须执行 `smartbi --version` 验证版本。若版本低于 2.2.0，必须重新执行 `npm install -g @smartbi/cli@latest` 升级。
+- 不得使用 `yarn` / `pnpm` / `bun` / `npx` 等替代上述 **npm 全局安装** 作为本 skill 的默认安装路径（避免版本漂移与不可审计环境）。
+- 不得调用项目目录内随意脚本、其它产品 CLI、或路径/名称相近的可执行文件冒充 `smartbi`。
+- **配置文件唯一来源**：安装并执行 `smartbi init` 后，使用默认路径 `**~/.smartbi/config.yaml`**（或你明确使用且与 init 产物一致的 `--config` 路径）。不得从全盘、用户主目录或其它产品中“找一个长得像的配置文件”复制或 `--config` 指向。
 
-## CLI 不存在时（MUST 先于一切）
+## CLI 不存在时（必须 先于一切）
 
 若执行 `smartbi` 时系统/shell 明确提示 **命令不存在**（例如 `command not found`、`'smartbi' 不是内部或外部命令`、`is not recognized as an internal or external command`、`ENOENT`、退出码 **127** 等），说明 **SmartBI CLI 尚未安装、未加入 PATH，或会话中途被卸载/破坏**。
 
-此时 MUST：
+此时必须：
 
 1. **不要**继续在 skill 流程里尝试 `list`/`search`/`describe`/`call` 或猜测接口；不要换目录“盲找”可执行文件；不要用 `curl`/HTTP 等替代 CLI。
 2. **直接**按下方 **标准安装** 在终端**实际执行**安装命令，然后执行 `smartbi --version` 验证。
-3. 验证通过后按下方 **重装后恢复顺序** 处理 init 与配置，再回到业务 Phase。
+3. 验证通过后按下方 **重装后恢复顺序** 处理 init 与配置，再回到业务流程。
 
-## 重装后恢复顺序（MUST）
+## 重装后恢复顺序（必须）
 
 在 `**npm install -g @smartbi/cli@latest` 且 `smartbi --version` 已成功** 之后，按顺序执行；不得口述“已安装”、不得跳过 `--version`。
 
 1. **检查默认配置是否存在且可读**：`~/.smartbi/config.yaml`（或用户此前声明的 `--config` 路径）。
 2. **若文件不存在**：按 **生成配置文件** 与 **缺项时固定提问模板** 补齐配置。文件存在但解析失败时按具体错误处理，不能因“不确定”而覆盖配置。
 3. **若已有可读配置**：复用所选环境和已知信息，无需用户再次确认配置仍可信。用原任务所需的最小只读命令继续验证；失败按原因处理：鉴权错误只处理凭证，网络错误检查连通性，权限错误核对权限，不回退全量 init。`--dry-run`只能验证本地请求构造，不能证明服务器可达或令牌有效。
-4. 仅当满足 **Phase 0 退出标准** 后，才恢复 `list`/`search`/`describe`/`call` 等业务命令。
+4. 仅当满足 **第零阶段退出标准** 后，才恢复 `list`/`search`/`describe`/`call` 等业务命令。
 
 ## 标准安装
 
@@ -40,27 +40,27 @@ smartbi --version
 
 要求：
 
-- `smartbi` 版本 MUST >= `2.2.0`
+- `smartbi` 版本必须 ≥ `2.2.0`
 - Node.js `>=18`
 - 默认配置文件：`~/.smartbi/config.yaml`
 
 ## 生成配置文件
 
-分「首次配置」与「新增连接」两条路径。只补问缺失的地址或令牌；内部 profile 名不向普通业务用户提问。环境确定、执行规则与错误处理见 `references/profiles.md`。
+分「首次配置」与「新增连接」两条路径。只补问缺失的地址或令牌；内部 profile 名不向普通业务用户提问。环境确定、执行规则与错误处理见 `references/common-core/profiles.md`。
 
 ### 首次配置（无配置文件时）
 
 1. 按「缺项时固定提问模板」只收集缺失的连接信息（一次一个问题）。
-2. 执行 `smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`；需要调整超时可加 `--timeout-ms <ms>`，默认 300000）。默认字面量存储；若用户选择「环境变量」→ 改用 `--token-env <VAR>`（提醒用户该环境变量后续需保持可用）；「系统钥匙串」→ 使用当前 shell 的安全 stdin 管道传入令牌并带 `--token-keyring --token-stdin`，不要把字面令牌写进命令历史（裸 `--token-keyring` 会失败并提示补值方式）；仅当用户**明确要求**浏览器登录时，才按下方「浏览器授权登录与登出」执行。
+2. 执行 `smartbi init --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌> [--profile <环境名>]`（不指定 `--profile` 时默认 `dev`）。默认字面量存储；若用户选择「环境变量」→ 改用 `--token-env <VAR>`（提醒用户该环境变量后续需保持可用）；「系统钥匙串」→ 使用当前 shell 的安全 stdin 管道传入令牌并带 `--token-keyring --token-stdin`，不要把字面令牌写进命令历史（裸 `--token-keyring` 会失败并提示补值方式）。
 3. CLI 原子写盘 `~/.smartbi/config.yaml`（该环境同时为默认环境）。stderr 的 "prefer tokenEnv or keyring" 提示属正常输出。
-4. 不向用户展示配置文件路径、内部 profile 名或内容；配置成功后继续原业务请求。需要区分多个连接时按 `references/profiles.md` 用服务器地址或业务名称说明。
+4. 不向用户展示配置文件路径、内部 profile 名或内容；配置成功后继续原业务请求。需要区分多个连接时按 `references/common-core/profiles.md` 用服务器地址或业务名称说明。
 
 存储方式的说明已含于「缺项时固定提问模板」第二步的令牌问询话术内，写入后不要再重复询问。
 
 ### 新增环境（已有配置文件时）
 
 1. 按「缺项时固定提问模板」只收集缺失的连接信息（一次一个问题）。
-2. 执行 `smartbi profile add <name> --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌>`（默认环境保持不变；需要调整超时可加 `--timeout-ms <ms>`，默认 300000；也可用 `--base-url-env <VAR>` 让地址在调用时从环境变量读取）。用户选择「环境变量」→ 以 `--token-env <VAR>` 替代 `--token`（提醒该环境变量后续需保持可用）；「系统钥匙串」→ 使用当前 shell 的安全 stdin 管道传入令牌并带 `--token-keyring --token-stdin`，不要把字面令牌写进命令历史；仅在用户**明确要求**浏览器登录时，才按下方「浏览器授权登录与登出」执行。
+2. 执行 `smartbi profile add <name> --server-type <sdk-server|smartbi> --base-url <地址> --token <令牌>`（默认环境保持不变）。用户选择「环境变量」→ 以 `--token-env <VAR>` 替代 `--token`（提醒该环境变量后续需保持可用）；「系统钥匙串」→ 使用当前 shell 的安全 stdin 管道传入令牌并带 `--token-keyring --token-stdin`，不要把字面令牌写进命令历史。
 3. 需要新环境成为默认时——先经用户确认，再执行 `smartbi profile set-default <name>`。
 4. 写入后继续原业务请求；需要告知连接状态时说“已连接到所选 SmartBI 地址”，不展示内部 profile 名或配置内容。存储方式的说明已含于令牌问询话术（「缺项时固定提问模板」第二步），写入后不要再重复询问。
 
@@ -68,30 +68,30 @@ smartbi --version
 
 缺少地址才询问地址；地址已知而令牌不可用时仅补凭证。配置了tokenEnv或tokenKeyring不等于缺少令牌，先检查对应来源可用性，不打印凭证。环境变量缺失时恢复该变量，不擅自改为字面量存储。更新已有环境按当前CLI契约使用profile操作，保留其他环境和默认选择，不使用`init --force`。`profile add --force`会替换所选profile，不能假设它只更新令牌；执行前核对需要保留的地址、服务器类型及其他设置，不可静默丢失自定义配置。
 
-`smartbi login` 只接受 keyring 型 profile：对字面量或 tokenEnv 型 profile 执行会被拒绝（`Profile '<name>' does not use the system keyring`）。已有 profile 想改用浏览器登录时：经用户明确同意，可另建一个 keyring 型 profile 后登录；或经用户确认后 `smartbi profile remove <name> --yes` 再 `smartbi login` 重建（会删除该 profile 及其 keyring 凭据、自定义设置）。不要用 `profile add <name> --token-keyring --force` 假装转换——非交互下它仍要求提供令牌值，且会替换整个 profile。**不得因登录方式更省事而推荐此路径**；默认仍用令牌。
+### 浏览器授权登录与登出（仅用户明确要求时）
 
-### 浏览器授权登录与登出（可选凭证方式，仅用户明确要求时）
+默认仍使用个人访问令牌，不在令牌问询中主动推荐浏览器登录。用户明确要求时才执行；仅支持系统钥匙串型 profile，不能把字面量或环境变量 profile 静默转换为钥匙串。
 
-- **适用**：用户**明确要求**浏览器授权登录，或已有 keyring 型 profile 需要刷新令牌。不得在令牌问询中主动提供或作为默认推荐。
-- **创建**：profile 或配置文件不存在时 login 可就地创建；非交互环境必须显式给 `--server-type` 与 `--base-url`。已存在的 profile 不接受这两个参数。
-- **授权**：完整授权链接始终打印到 **stderr**（`--agent` 模式 stdout 为 YAML）；MUST 将链接转呈用户，在**与 CLI 同一台机器**的浏览器中打开。固定回调 `127.0.0.1:24680/callback`，端口被占用即失败且不回退；浏览器不在本机时按 stderr 提示先建立 SSH 隧道。
-- **超时**：默认等待 300s；执行时收紧到 `--timeout-ms 120000`。超时或授权失败后不盲目重试，改用令牌流程完成配置。失败会回滚本次新建的配置骨架，不留半成品。
-- **登出**：`smartbi logout --profile <name>` 先到服务端吊销令牌，再删除本地 keyring 凭据；吊销失败返回 exit 3 并明确提示该令牌在有效期内仍可用，不得声称已完全登出。
+- 新连接的命令为 `smartbi login --profile <name> --server-type <smartbi|sdk-server> --base-url <URL> --timeout-ms 120000`；已有 profile 时不再传 server-type/base-url。配置缺失时 CLI 可就地创建；非交互环境必须明确地址和类型。
+- 授权链接在 stderr，须转呈用户并由与 CLI 同一台机器的浏览器完成。固定回调为 `127.0.0.1:24680/callback`，不自动改端口；端口占用先处理占用原因，不终止无关进程。
+- 已有非钥匙串 profile 时，保留原配置；用户明确同意后才另建连接。删除重建会移除该连接及其钥匙串和自定义设置，必须有对应授权，不能用 `profile add --token-keyring --force` 冒充无损转换。
+- 等待上限使用120秒，超时或授权失败后不盲目重试，回到令牌配置流程；不猜测浏览器已授权成功。授权失败会回滚本次新建配置骨架，已有配置仍需按实际结果核实，不能主动覆盖。远程浏览器与 CLI 不在同机时，按实际部署建立回调通路，否则说明限制。
+- `smartbi logout --profile <name>` 会尝试服务端吊销再清理钥匙串。吊销失败返回exit 3，此时令牌可能仍在有效期内，不能声称已完全登出；按CLI结果说明当前状态。
 
 ### 配置字段说明
 
 - **`baseUrl`**：SmartBI 或 SDK Server 的根 URL。用户提供 SmartBI 地址（如 `http://127.0.0.1:8080/smartbi`）→ `serverType: smartbi`；用户提供 SDK Server 地址（如 `http://127.0.0.1:8086`）→ `serverType: sdk-server`。
-- **`token`**：SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。token 存储三选一（schema 互斥，只能配其一）：`token` 字面量（默认）/ `tokenEnv`（环境变量名）/ `tokenKeyring: true`（系统钥匙串，service=smartbi-cli、account=profile 名）。浏览器授权登录写入的就是 `tokenKeyring` 这一种，无需 `token` 字段。
-- **`timeoutMs`**：请求超时（毫秒），默认 300000；可用 `init`/`profile add` 的 `--timeout-ms` 或单次 `call --timeout` 覆盖。`--timeout` 只接受纯十进制正整数。
+- **`token`**：SmartBI 个人访问令牌（登录 SmartBI 后，在「个人中心 → 我的设置 → 个人访问令牌」中新建）。token 存储三选一（schema 互斥，只能配其一）：`token` 字面量（默认）/ `tokenEnv`（环境变量名）/ `tokenKeyring: true`（系统钥匙串，service=smartbi-cli、account=profile 名）。
+- **`timeoutMs`**：默认请求超时300000毫秒；`init` 和 `profile add` 可用 `--timeout-ms` 设置，单次 `call --timeout` 可覆盖。`profile add --base-url-env <VAR>` 可按调用时的环境变量读取地址，不要求同时写入固定地址。
 - **`serverType`**：只能为 `sdk-server` 或 `smartbi` 两个值之一，不得使用其他大小写或命名变体（如 `smartbi-server`、`sdk_server` 等）。
 
 约束：
 - 不得臆造配置值；缺失时必须先向用户提问并等待补齐。
 - 用自然语言提问，不要暴露 `baseUrlEnv` / `tokenEnv` 等配置键名；如需提及更安全的存储方式，用「环境变量 / 系统钥匙串」的口语表述（存储说明见「缺项时固定提问模板」第二步）。
 - 写入后不向普通业务用户展示配置文件路径或内部 profile 名；直接继续原业务请求。
-- **内部 profile 名**：首次配置省略 `--profile`，由 CLI 使用默认值；新增连接按 `references/profiles.md` 在内部生成不冲突的名称，不为此单独提问。
+- **内部 profile 名**：首次配置省略 `--profile`，由 CLI 使用默认值；新增连接按 `references/common-core/profiles.md` 在内部生成不冲突的名称，不为此单独提问。
 
-### 缺项时固定提问模板（MUST）
+### 缺项时固定提问模板（必须）
 
 当所选环境缺少必要连接信息时，只补问尚未确认的项目；已知项跳过。凭证来源不可用按上方“修复已有环境”处理。**一次只问一个问题**，以下模板按实际缺项选择，不要求每次从第一步重新开始：
 
@@ -118,7 +118,7 @@ smartbi --version
 
 在你补齐前，我会先暂停，不会继续调用 `smartbi` 命令。
 
-**内部命名（不向普通业务用户提问）：** 首次配置省略 `--profile`；CLI 的默认 profile 名为 `dev`，仅用于命令和配置。用户明确要求新增连接时，按 `references/profiles.md` 从已提供的业务名称或连接顺序生成不冲突的内部名称。客户无需理解或设置该名称。
+**内部命名（不向普通业务用户提问）：** 首次配置省略 `--profile`；CLI 的默认 profile 名为 `dev`，仅用于命令和配置。用户明确要求新增连接时，按 `references/common-core/profiles.md` 从已提供的业务名称或连接顺序生成不冲突的内部名称。客户无需理解或设置该名称。
 
 ## 最小可用配置（示例）
 
@@ -139,8 +139,23 @@ registry:
   checkIntervalSeconds: 300
 ```
 
-## Phase 0 退出标准
+## 第零阶段 退出标准
 
 - `smartbi --version` 可执行；
-- 所选profile的地址与服务器类型已确定，且所选凭证来源（token/tokenEnv/tokenKeyring之一，浏览器登录对应 tokenKeyring）可用；不要求环境变量或钥匙串模式另配字面token。
+- 所选profile的地址与服务器类型已确定，且所选凭证来源（token/tokenEnv/tokenKeyring之一）可用；不要求环境变量或钥匙串模式另配字面token。
 - 配置可用于后续 `list/search/describe/call`。
+
+## serverType 路径差异
+
+两种 `serverType` 的 API 路径格式不同，影响 Rhino 脚本内 HTTP 调用及 `smartbi call` 行为：
+
+| `serverType` | 配置 `baseUrl` 示例 | 实际请求路径（queryDataByMql） |
+|-------------|-------------------|-------------------------------|
+| `smartbi` | `http://host/smartbi` | `http://host/smartbi/sdk/api/v1/datamodel/datamodel/query-data-by-mql` |
+| `sdk-server` | `http://host:8086` | `http://host:8086/api/v1/datamodel/datamodel/query-data-by-mql` |
+
+关键差异：
+- `smartbi` 模式由 CLI 在配置 baseUrl 后追加 `/sdk`；手工 HTTP 调用也需使用当前契约对应的 SDK 根地址，不重复追加
+- `sdk-server` 模式部分接口路径中 domain 重复（`datamodel/datamodel`），需注意区分
+- 使用 `smartbi call` CLI 时无需手动拼路径（CLI 内部处理前缀），但若在 Rhino/JS 脚本中直连 HTTP 需按 serverType 构造完整 URL
+

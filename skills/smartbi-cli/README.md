@@ -1,179 +1,142 @@
-# SmartBI CLI Skill
+# SmartBI 业务操作技能
 
-Skill 版本：**2.2.0**。运行时依赖的 `@smartbi/cli` 版本独立管理，最低要求为 2.2.0。
+广州思迈特软件有限公司提供的 SmartBI 通用业务操作技能，通过 `@smartbi/cli` 调用当前环境开放且有权限的 API。Skill 版本 **2.3.0**，CLI 最低版本 **2.2.0**；二者版本独立管理。路径使用英文，标题与正文使用中文。
 
-保留标准 Skill 的业务路由，为数据类请求采用基于模型的直接取数路径：用户问句 → 读取必要模型信息 → 根据模型与 SDK 能力选择 MQL 或只读 SQL → CLI 调用 SDK → 校验数据 → 桌面智能体分析/展示。直接取数不依赖模型训练或 AI 问数，无需额外查询框架。详见 `references/query-routing.md`。
+2.3.0 更新：统一模型查询元数据入口与完整定义补充规则；完善模型、已有报表及白泽取数路径，校正定时任务与消息发送说明；恢复独立的智能体与工具管理模块；各场景按需加载，公共规则和必要辅助工具共享。
 
-在原版场景索引中新增数据查询与洞察，入口为 `scenarios/data-query.md`；原有通用 API、定时任务和推送保留。外部智能体通过接口定位资源，不依赖 SmartBI 页面预选信息。模型取数按语义选择 MQL/只读 SQL，已有报表按定义与参数查询/导出；正式报告、归因、预测和综合大屏按路由默认白泽，用户指定直接取数或本地分析时遵循其选择。已有数据制图和文件转换继续本地处理；创建或修改 SmartBI 报表仍走资源操作接口。
+## 完整目录与文件职责
 
-普通取数依赖 Node/npm 全局安装的 SmartBI CLI（>=2.2.0）。Python 仅用于可选辅助脚本/文件读取，不是 MQL 前置条件。跨桌面客户端需具备命令执行和文件读写能力；不能把单一客户端的实测视为所有客户端已验证。
-
-支持具备命令执行和文件读写能力的桌面智能体，通过 `@smartbi/cli` 发现并调用当前环境开放且有权限的 SmartBI API。
-
-## 目标
-
-```
-          ┌──────────┐
-          │ 任意 Agent │
-          └─────┬────┘
-                │ 自然语言意图
-                ▼
-┌───────────────────────────────┐
-│   smartbi-cli skill           │
-│                               │
-│  意图 → operationKey → call   │
-│                               │
-│  定时计划任务 / ...           │
-└───────────────┬───────────────┘
-                │ smartbi call
-                ▼
-┌───────────────────────────────┐
-│   SmartBI OpenAPI             │
-│   (datamodel / scheduletask   │
-│    tabularmodel / aichat ...) │
-└───────────────────────────────┘
-```
-
-Skill 提供业务路由与调用规则，实际能力取决于当前 SDK、模型定义和账号权限。
-
-普通“查询XXX数据”默认取齐指定条件和粒度下的结果；`limit`控制单次批量，满批且无结束证据时继续分页。明确TopN/前N条/样本时按指定范围停止。数据默认直接展示，文件按需交付；不能将首批或预览称为全部，执行受容量或耗时限制时明确说明未完成范围。
-
-## 架构
-
-```
-SKILL.md                         ← 入口（agent 加载）
-│
-├─ 直接取数                       ← 必要元数据 → MQL/SQL → 校验 → 本地分析/交付
-│   query-routing.md / data-model-query.md
-│
-├─ Part 1: Core CLI Workflow     ← 骨架，所有 OpenAPI 调用通用
-│   Phase 0  惰性预检
-│   Phase 1  Discover  (smartbi list)
-│   Phase 2  Contract  (smartbi describe + doc)
-│   Phase 3  Execute   (smartbi call)
-│   Phase 4  Diagnose  (失败诊断)
-│
-├─ Part 2: Scenario Guides（索引）  ← 按意图路由，命中后加载对应文件
-│
-├─ scenarios/                    ← 场景文件（每个独立验证）
-│   ├─ schedule-task.md          S1 定时计划任务
-│   ├─ push-message.md           S2 消息推送
-│   └─ data-query.md             数据查询与洞察
-│
-└─ references/                   ← 参考手册（按需加载）
-    ├─ init.md                   安装与配置
-    ├─ profiles.md               多环境（profile）规范
-    ├─ discovery.md              Phase 1 详细流程
-    ├─ describe.md               Phase 2 详细流程
-    ├─ call.md                   Phase 3 详细流程
-    ├─ strategy.md               策略与常见模式
-    ├─ rhino-template.md         MQL 取数 Rhino JS 模板（共用）
-    └─ doc-index.md              domain → 文档路径索引
+```text
+smartbi-cli/  # 可安装、发布的单一技能
+├── agents/                                    # 平台展示配置，不承担业务执行
+│   └── openai.yaml                            # 技能展示名称、简介和默认调用提示
+├── references/                                # 按需读取的公共规则与各业务模块详细说明
+│   ├── agent-management/                      # 智能体与工具配置管理，普通问数不加载
+│   │   ├── agent-workflows.md                 # 工作流读取、创建、更新、备份、哈希与回读
+│   │   └── tool-providers.md                  # Provider列举、读取、解析和配置维护边界
+│   ├── baize-analysis/                        # 白泽问数与洞察专用规则
+│   │   ├── sessions-and-logs.md               # 白泽执行边界、训练前提、会话、SSE、日志和交付检查
+│   │   └── troubleshooting.md                 # 白泽流、轮次、工具节点、沙箱和输出的分层排错
+│   ├── common-core/                           # 公共操作指南；连接、API调用、资源发现、查询校验与文件处理，按需读取
+│   │   ├── api-calls.md                       # 参数来源、业务缺项、请求构造、调用、子任务和重试
+│   │   ├── api-contracts.md                   # 核对describe契约、请求结构与SDK文档
+│   │   ├── api-discovery.md                   # 通过list/search发现API操作，区分接口与业务资源
+│   │   ├── artifact-handling.md                # 可选文件读取与保真规则，按需使用公共文件工具
+│   │   ├── profiles.md                        # 多环境连接选择、追加配置与切换
+│   │   ├── query-results.md                   # 查询共用的授权、上下文、范围与完整性；文件细节按需另读
+│   │   ├── resource-discovery.md              # 目录搜索、模型与报表类型、可见性和同名消歧
+│   │   ├── sdk-doc-index.md                   # API业务域到SDK文档的路径索引
+│   │   ├── setup-and-connection.md            # CLI安装、地址与令牌初始化、连接修复
+│   │   └── troubleshooting.md                 # CLI、认证、权限、网络及业务失败的公共排错
+│   ├── model-query/                           # 模型直接取数专用规则，不依赖白泽会话
+│   │   ├── model-query.md                     # 模型类型识别、元数据及 JSON/MQL/SQL 请求、返回与分页差异
+│   │   └── query-semantics.md                 # 指标、时间、粒度、关联与统计计算规则；不重复执行流程
+│   ├── report-query/                          # 已有报表读取专用规则
+│   │   └── report-query.md                    # 报表元数据、有效参数、查询/导出与口径核对
+│   └── scheduled-tasks/                       # 定时任务实现参考
+│       ├── rhino-script-template.md           # 服务端Rhino取数、分页和消息发送脚本模板
+│       └── task-execution.md                  # 任务更新、目录、请求模板、脚本注入和计划状态回读
+├── scenarios/                                 # 按用户业务任务选择的独立场景入口
+│   ├── agent-management.md                    # 智能体工作流和工具Provider的管理入口
+│   ├── baize-analysis.md                      # 白泽AI问数、归因、预测及复杂洞察
+│   ├── message-delivery.md                    # 消息与附件发送，核实渠道、接收人及送达状态
+│   ├── model-query.md                         # 模型字段、参数、成员与直接取数；覆盖新旧指标模型
+│   ├── report-query.md                        # 读取已有报表，保留报表参数、筛选与统计口径
+│   ├── resource-discovery.md                  # 列举或搜索模型与报表，核对资源身份和类型
+│   └── scheduled-tasks.md                     # 管理定时任务与计划；按任务内容组合其他模块
+├── scripts/                                   # 必要的可执行辅助工具，按使用模块分类
+│   ├── agent-management/                      # 内部管理辅助能力，仅SDK不足且契约已确认时使用
+│   │   └── smartbi_internal.py                # 六个旧版管理命令，支持预览、哈希、备份与回读
+│   ├── baize-analysis/                        # 白泽会话辅助工具
+│   │   └── baize_session.py                   # 运行、检查或恢复会话；启用下载时加载公共文件工具
+│   ├── common-core/                           # 公共辅助工具；按需用于模型、报表或白泽的文件处理
+│   │   └── artifact_io.py                     # 解析文件事件、经CLI下载、读取CSV/Excel/Parquet
+│   └── scheduled-tasks/                       # 定时任务请求构造工具
+│       └── inject-script.mjs                  # 将多行RhinoJS安全转义并注入JSON请求体
+├── README.md                                  # 每个目录和文件的用途、场景边界及模块依赖
+└── SKILL.md                                   # 统一入口：触发条件、公共规则、通用CLI流程与场景索引
 ```
 
-## 当前能力
+`scenarios/` 选择业务路径，`references/` 提供详细规则，`scripts/` 执行必要辅助操作。公共层不反向要求安装业务模块；已明确的简单查询不必加载全部参考。
 
-| 场景 | 能力 | 状态 |
-|------|------|------|
-| **直接 MQL 取数** | 字段发现、过滤、聚合、排序、分页及按需计算，本地分析与文件交付 | 按目标环境契约、模型字段和查询结果逐次校验 |
-| **通用 OpenAPI 调用** | `smartbi list` → `describe` → `call`，按当前注册接口执行 | 保留原标准流程 |
-| **S1 定时计划任务 / S2 推送** | 定时任务、脚本及消息推送指南 | 保留原场景，本轮只读验收不代表写操作已复测 |
-| **已有报表取数** | 资源发现、元数据、参数、导出与文件校验 | 按报表类型、有效参数和业务结果逐次校验 |
-| **SmartBI AI / Baize** | 按数据查询与洞察场景处理显式请求或复杂洞察 | 按需分支，不是普通直接取数前置 |
-| **浏览器授权登录** | `smartbi login`（OAuth2 + PKCE）令牌写入系统钥匙串；`smartbi logout` 服务端吊销并清理本地凭据 | 可选凭证方式，**仅在用户明确要求时使用**；超时或失败不重试，改用令牌流程 |
+## 按需加载
 
-> 新场景按具体类型和路径完成端到端验收后才声明支持；已加入的扩展说明须保留未验证边界。
+主入口负责场景路由和公共调用流程，场景文件负责业务接口选路、最短步骤、补充加载条件和停止边界。参考说明具体请求与业务规则，不重新制定另一套优先级。
 
-## 依赖
+模型已定位、接口已选择且元数据充分时，直接组织查询；缺少身份才加载资源发现，缺少字段或参数才补元数据，涉及时间/比率/关联才加载模型语义，范围不明才读取公共结果规则，实际需要文件时才加载文件说明与工具。首次使用所选接口仍须核对必要契约，不通过连续尝试接口代替能力判断。
 
-- **npm 包**：`@smartbi/cli >= 2.2.0`（`npm install -g @smartbi/cli@latest`）
-- **外部 skill**：**零**。本 skill 自闭环，不依赖任何其他 skill。
+## 模块职责与修改位置
 
-## 使用说明
+每个文件按所在模块维护；供多个场景使用的连接、接口调用、资源发现与结果处理规则统一归入 `common-core（公共基础）`。服务其他场景不改变文件归属，平台展示配置也不承担业务执行。
 
-### 安装
+| 修改目标 | 主要位置 | 调整内容 |
+|---|---|---|
+| 模型取数的进入条件和执行步骤 | `scenarios/model-query.md` | 何时查询模型、如何衔接元数据和结果检查、何时停止或澄清 |
+| 数据模型字段、参数、成员及 MQL/SQL/结构化查询构造 | `references/model-query/model-query.md` | 修改“模型类型与查询对象”“资源定位与查询元数据”“结构化查询（JSON）”“MQL”“SQL”等对应小节；保留模型语义和结果校验 |
+| 指标算法、日期、分组及关联口径 | `references/model-query/query-semantics.md` | 修改模型业务语义；不在公共结果文件重复定义算法 |
+| 默认取数范围、分页和完整性 | `references/common-core/query-results.md` | 修改公共结果规则；模型、报表和白泽仍按各自接口判断结果 |
+| 业务资源的搜索和消歧 | `references/common-core/resource-discovery.md` | 修改资源类型范围、匹配及候选选择；不是 API 操作发现 |
+| 连接、参数契约或调用异常 | `references/common-core/` 下相应文件 | 修改公共基础能力；不添加特定客户地址、模型 ID 或字段映射 |
+| 已有报表或白泽执行 | `scenarios/report-query.md`、`scenarios/baize-analysis.md` 及同名参考目录 | 在各自模块修改；普通模型查询不依赖它们 |
+| 智能体工作流与工具配置管理 | `scenarios/agent-management.md`、`references/agent-management/`、`scripts/agent-management/` | 调整管理流程和专用辅助能力，不改普通白泽问数流程 |
+
+只调整模型查询细节时，从模型场景和模型参考入手，无需先改主入口。若要删除整个场景，则按下面“依赖与单场景使用”同步收窄 `SKILL.md`、展示信息及引用。修改文件中的查询规则不会改变 SmartBI 服务端模型定义。
+
+## 业务入口
+
+| 用户需求 | 场景 |
+|---|---|
+| 有哪些模型或报表、按名称找资源 | [资源发现](scenarios/resource-discovery.md) |
+| 查询模型字段、参数、指标或明细 | [模型取数](scenarios/model-query.md) |
+| 基于已有报表查看、统计或解读数据 | [报表问数](scenarios/report-query.md) |
+| 明确白泽/AI问数，或归因、预测等复杂分析 | [白泽问数与洞察](scenarios/baize-analysis.md) |
+| 读取、创建或修改智能体工作流和工具配置 | [智能体与工具管理](scenarios/agent-management.md) |
+| 定时执行、调度任务 | [定时任务](scenarios/scheduled-tasks.md) |
+| 通过站内消息、邮件、企微等渠道发送信息 | [消息发送](scenarios/message-delivery.md) |
+
+模型取数遵循用户指定的 MQL、JSON 或 SQL 方式；未指定时明细用 JSON 结构化查询，汇总优先 MQL，MQL 无法满足且可保持口径时用 JSON 备选。SQL 不作为自动兜底；先核实模型类型，`TABULAR_DATASET` 按当前契约使用 JSON 路径，新指标模型先定位可查询对象；已知 MQL 不支持时直接选 JSON，无需先失败。
+
+模型取数不依赖训练、白泽会话或Python；已有报表保留自身筛选和计算口径。资源发现只核实身份与可见性，不证明已经取到数据。智能体和工具配置管理走独立管理场景，优先SDK，缺少能力且内部契约已确认时才用管理辅助脚本；其他建模、数据源和资源权限操作使用通用CLI流程。
+
+## 依赖与单场景使用
+
+| 保留模块 | 必要内容 | 可选组合 |
+|---|---|---|
+| 资源发现 | 资源发现场景与共享资源发现规则、公共连接/API规则 | 定位后由主入口选择保留的执行场景 |
+| 模型取数 | 模型场景、模型参考、共享资源发现/查询规则和公共连接/API规则 | 文件读取按需使用公共文件工具 |
+| 报表问数 | 报表场景与参考、共享发现/查询规则及文件处理 | 用户另行要求底层模型分析时保留模型取数，并核实口径 |
+| 白泽问数与洞察 | 白泽场景、参考、会话工具及共享发现/查询规则 | 下载文件时保留公共文件工具；用户另行要求模型分析时需模型模块 |
+| 智能体与工具管理 | 管理场景、同名参考和专用脚本，公共连接/API规则 | 用户要求运行验收时再组合白泽模块 |
+| 消息发送 | 消息场景与公共连接/API规则 | 附件读取、定时发送按实际需要增加 |
+| 定时任务 | 定时场景、参考、注入脚本与公共连接/API规则 | 取数需模型或报表模块，发送需消息模块 |
+
+各模块只引用自身和公共文件；跨场景属于可选组合，由主入口核实当前保留能力后调度。未保留的能力应明确说明，不能继续加载缺失文件或伪称已经执行。
+
+裁剪时保留目标模块和必要公共文件，调整 `SKILL.md` 的能力描述、场景索引、组合声明和专用工具入口，更新README及平台提示。保留模块的正文不需要改写。模型仅返回接口数据时无需Python或任何专用辅助脚本；需要本地文件读取时才增加对应工具。
+
+## 安装与运行
 
 ```bash
 npm install -g @smartbi/cli@latest
-smartbi --version   # 确认 >= 2.2.0
-smartbi init --server-type <sdk-server|smartbi> --base-url <url> --token <token>
-                    # 全参数生成 ~/.smartbi/config.yaml
+smartbi --version
 ```
 
-### 在 Agent 中使用
+将完整目录放入目标智能体支持的技能目录，加载 `SKILL.md`。桌面智能体需要命令执行和文件读写能力。连接配置按共享安装指南处理；无地址时可确认连接 SmartBI 官网体验中心 `https://cloud.smartbi.com.cn/smartbi`，个人访问令牌在「个人中心 → 我的设置 → 个人访问令牌」创建，已有配置直接复用。
 
-1. 将本目录放到 agent 的 skills 路径下（如 Cursor 的 `.cursor/skills/`、Claude Code 的配置的 skills 目录等）
-2. Agent 加载 `SKILL.md` 后自动获得以下能力：
-   - 发现接口：未知操作时由 `smartbi list --profile <name> --agent` 语义匹配 → 得到 `operationKey`
-   - 查询快速路径：已知并核实 operationKey 时直接调用；尚未核实时 `describe → call`；只有契约不足才读取 doc
-   - 理解契约：`smartbi describe <key> --profile <name> --agent` → 加载文档 → 理解参数
-   - 执行调用：`smartbi call <key> --profile <name> -d @body.json --agent` → 返回结果
-   - 定时任务：识别定时意图 → 生成 Rhino JS → 创建 task + schedule → 启用
+Python仅用于可选辅助脚本；Excel、Parquet等格式依赖按需安装。脚本支持 `--help`，会话和文件下载支持 `--config` 指定CLI配置。不依赖其他Skill。
 
-### 场景路由
+发布目录只包含技能说明、平台配置、场景、参考与必要辅助代码。请求、令牌、业务数据、日志、测试与过程材料均放在技能目录外；字节码缓存不属于发布文件。实际接口与渠道能力取决于部署、模型和账号权限。
 
-Agent 根据用户问句自动选择场景：
+## 旧版辅助脚本迁移
 
-```
-用户问句
-  ├─ 明确要求定时、推送或资源操作 → 原场景 / 通用 API 流程
-  ├─ 普通模型问数 → 模型元数据 → MQL/只读 SQL → 校验结果
-  ├─ 已有报表问数 → 报表定义与参数 → 只读查询/导出 → 校验结果
-  ├─ 明确白泽或默认复杂洞察 → 会话流程（用户指定直接/本地优先）
-  └─ 已有数据的本地报告、图表或文件转换 → 桌面智能体本地处理
-```
+原平铺脚本 smartbi_internal.py 迁至 scripts/agent-management/smartbi_internal.py，保留六个子命令和原参数，调用方更新路径即可。内部认证仍由显式环境变量提供，不等同CLI profile；创建与更新默认预览。Provider执行、写入和定义上传下载保留契约说明，不宣称已有自动化命令。此模块可整体裁剪，普通模型/报表取数和白泽执行不依赖它。
 
-## 如何新增 Scenario
+其他原平铺脚本现位于对应模块目录：白泽会话工具为 `scripts/baize-analysis/baize_session.py`，文件工具为 `scripts/common-core/artifact_io.py`，任务注入工具为 `scripts/scheduled-tasks/inject-script.mjs`。外部程序若固定了旧路径，应同步更新。
 
-1. 新建 `scenarios/<name>.md` — 自描述文件：触发条件 + 请求体模板 + 注意事项
-2. 通过实际 API 调用端到端验证（Python 脚本或 smartbi call）
-3. `SKILL.md` Part 2 索引表加一行
-4. 如有新的共享代码模板 → `references/` 下新增
+白泽会话工具的调用变化：
 
-每个新场景必须经过端到端验证后才可入库，不添加未验证的 placeholder。
+- `run` 默认不拉取日志；需要时增加 `--collect-logs`，或单独执行 `logs`。
+- `run` 退出码 `0` 表示传输成功且本轮 `NORMAL`，业务答案仍需校验；`1` 表示传输失败或本轮失败／中断；`2` 表示本轮仍在运行、缺失或状态未知，不得当作成功。
+- 已核实存在的会话用 `run --conv-id` 提交新一轮问题；恢复上次断开的流用 `resume`，不重新提交问句。每轮使用独立输出目录保存证据。
 
-## 示例对话
-
-**即时查询**：
-> 用户：帮我查一下上个月各分支行的贷款余额
-> Agent：复用或定位模型，核实余额口径后直接MQL查询，返回各分支行余额、日期范围和必要说明；需要文件时下载校验后给本地文件，不暴露签名地址。
-
-**定时计划任务**：
-> 用户：每天 9:00 发送保额大于 20 万的保单数据到邮箱
-> Agent：创建 Rhino JS 脚本（MQL 取数 + 过滤 + HTML 格式化）→ 创建任务 → 创建计划（DAY, 9:00, MAIL）→ 启用
-
-## 文件清单
-
-```
-smartbi-cli/
-├── README.md                    ← 本文件
-├── SKILL.md                     ← skill 入口（agent 加载）
-├── agents/                      ← Agent入口提示
-│   └── openai.yaml
-├── scripts/                     ← 按需辅助工具，不是普通查询前置
-│   ├── artifact_io.py           文件识别、下载与读取
-│   ├── baize_session.py         白泽路径的会话工具
-│   ├── smartbi_internal.py      会话工具共用模块
-│   └── inject-script.mjs        脚本参数注入
-├── scenarios/                   ← 保留标准业务场景
-│   ├── schedule-task.md         S1 定时计划任务
-│   ├── push-message.md          S2 消息推送
-│   └── data-query.md            数据查询与洞察（扩展）
-└── references/                  ← 参考手册
-    ├── query-routing.md         直接取数范围、最小路径及校验
-    ├── data-model-query.md      MQL/SQL接口契约与示例
-    ├── metric-model-query.md    指标模型查询
-    ├── report-query.md          已有报表定位、参数、导出与校验
-    ├── artifact-handling.md     文件值保真及格式处理
-    ├── sessions-and-logs.md     白泽会话与执行校验
-    ├── agent-workflows.md / custom-tools.md / insight-agent-behavior.md
-    ├── troubleshooting.md      按失败层级排错
-    ├── init.md
-    ├── profiles.md
-    ├── discovery.md
-    ├── describe.md
-    ├── call.md
-    ├── strategy.md
-    ├── rhino-template.md        MQL 取数 Rhino JS 模板（共用）
-    └── doc-index.md
-```
+具体参数见各脚本 `--help`，白泽运行与状态处理见[会话参考](references/baize-analysis/sessions-and-logs.md)。

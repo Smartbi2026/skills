@@ -1,9 +1,8 @@
 # Domain → 文档路径索引
 
-各 domain 的主要业务文档路径，供 Phase 2 文档加载时快速定位。
-**仅收录 `docs/specs/` 下已有独立文档的 domain**。
+部分 domain 的候选业务文档路径，供第二阶段按需定位，不是完整 SDK 文档或能力清单。优先使用当前接口契约提供的链接；无链接且有具体信息缺项时才查本索引，用 `smartbi doc` 核实路径，不批量加载全部条目。
 
-> 本索引为 `SKILL.md` Phase 2 的补充参考，核心契约理解流程以 `SKILL.md` 为准。
+> 本索引为 `SKILL.md` 第二阶段 的补充参考，核心契约理解流程以 `SKILL.md` 为准。
 
 | domain | 入口文档 | 说明 |
 |--------|---------|------|
@@ -77,6 +76,6 @@ MQL 查数接口相关文档：
 
 ## 使用方式
 
-Phase 2 `describe` 输出中，若 `description` 包含 `[说明](/docs/specs/...)` 形式的链接，直接用 `smartbi doc /docs/specs/... --profile <name> --agent` 加载。
+第二阶段 `describe` 输出中，若 `description` 包含 `[说明](/docs/specs/...)` 形式的链接，直接用 `smartbi doc /docs/specs/... --profile <name> --agent` 加载。
 
 本索引用于在 `description` 中无显式链接时，根据 domain 推断可能存在的文档路径。加载时仍应使用 `smartbi doc` 验证路径可用性。

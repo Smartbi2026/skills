@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Run and inspect SmartBI Baize conversations through the SmartBI CLI.
+"""通过 SmartBI CLI 执行和检查白泽会话。
 
-The helper always passes request bodies via temporary JSON files and removes
-them when the command ends. It never reads or prints SmartBI credentials.
+请求体使用临时 JSON 文件，命令结束后清理；不读取或打印 SmartBI 凭证。
 """
 
 from __future__ import annotations
@@ -19,21 +18,29 @@ from typing import Any
 
 SMARTBI_CMD = "smartbi.cmd" if os.name == "nt" else "smartbi"
 
-from artifact_io import download_artifacts, find_artifacts
+def _artifact_helpers():
+    helper_dir = Path(__file__).resolve().parents[1] / "common-core"
+    if not (helper_dir / "artifact_io.py").is_file():
+        raise RuntimeError("文件下载需要保留 scripts/common-core/artifact_io.py；不下载文件时可省略该辅助模块")
+    sys.path.insert(0, str(helper_dir))
+    from artifact_io import download_artifacts, find_artifacts
+    return download_artifacts, find_artifacts
 
 
 def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _run(command: list[str], *, stdout_path: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(command: list[str], *, stdout_path: Path | None = None, config: Path | None = None) -> subprocess.CompletedProcess[str]:
+    if config is not None:
+        command = [*command, "--config", str(config)]
     if stdout_path is None:
         return subprocess.run(command, text=True, encoding="utf-8", errors="replace", capture_output=True, check=False)
     with stdout_path.open("w", encoding="utf-8") as output:
         return subprocess.run(command, text=True, encoding="utf-8", errors="replace", stdout=output, stderr=subprocess.PIPE, check=False)
 
 
-def _call_json(profile: str, operation: str, body_path: Path) -> dict[str, Any]:
+def _call_json(profile: str, operation: str, body_path: Path, *, config: Path | None = None) -> dict[str, Any]:
     result = _run(
         [
             SMARTBI_CMD,
@@ -44,16 +51,20 @@ def _call_json(profile: str, operation: str, body_path: Path) -> dict[str, Any]:
             "-d",
             f"@{body_path}",
             "--json",
-        ]
+        ],
+        config=config,
     )
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"{operation} failed with exit {result.returncode}")
+        raise RuntimeError(result.stderr.strip() or f"{operation} 执行失败，退出码 {result.returncode}")
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"{operation} returned non-JSON output") from exc
+        raise RuntimeError(f"{operation} 返回内容不是 JSON") from exc
     if payload.get("ok") is not True or int(payload.get("status") or 0) >= 400:
-        raise RuntimeError(f"{operation} failed: status={payload.get('status')}")
+        raise RuntimeError(f"{operation} 调用失败：status={payload.get('status')}")
+    business = payload.get("data")
+    if isinstance(business, dict) and business.get("success") is False:
+        raise RuntimeError(f"{operation} 返回业务失败；请根据响应排查，不将 HTTP 200 当作成功")
     return payload
 
 
@@ -138,6 +149,8 @@ def _conversation_payload(args: argparse.Namespace, conv_id: str, rpc_id: str, m
 
 
 def command_run(args: argparse.Namespace) -> int:
+    if args.download_artifacts:
+        download_artifacts, find_artifacts = _artifact_helpers()
     conv_id = args.conv_id or str(uuid.uuid4())
     rpc_id = str(uuid.uuid4())
     message_id = str(uuid.uuid4())
@@ -171,9 +184,10 @@ def command_run(args: argparse.Namespace) -> int:
         _write_json(rounds_request_path, {"convId": conv_id})
         _write_json(logs_request_path, {"query": {"skip": 0, "limit": args.log_limit, "convId": conv_id}})
 
-        created = _call_json(args.profile, "aichat.createConversation", create_path)
-        if ((created.get("data") or {}).get("success")) is not True:
-            raise RuntimeError("createConversation returned data.success != true")
+        if not args.conv_id:
+            created = _call_json(args.profile, "aichat.createConversation", create_path, config=args.config)
+            if ((created.get("data") or {}).get("success")) is not True:
+                raise RuntimeError("createConversation 返回的 data.success 不是 true")
 
         stream_result = _run(
             [
@@ -192,6 +206,7 @@ def command_run(args: argparse.Namespace) -> int:
                 "--agent",
             ],
             stdout_path=stream_path,
+            config=args.config,
         )
         stderr_path.write_text(stream_result.stderr or "", encoding="utf-8")
 
@@ -206,10 +221,10 @@ def command_run(args: argparse.Namespace) -> int:
                 operation=args.artifact_operation,
                 request_field=args.artifact_request_field,
                 overwrite=args.artifact_overwrite,
+                config=args.config,
             )
             artifact_results = [
                 {
-                    "uri": artifact.uri,
                     "name": artifact.name,
                     "path": str(path),
                     "bytes": path.stat().st_size,
@@ -217,15 +232,33 @@ def command_run(args: argparse.Namespace) -> int:
                 for artifact, path in zip(artifacts, downloaded)
             ]
 
-        rounds = _call_json(args.profile, "aichat.getConversationRounds", rounds_request_path)
-        logs = _call_json(args.profile, "aichat.queryChatLogs", logs_request_path)
+        rounds = _call_json(args.profile, "aichat.getConversationRounds", rounds_request_path, config=args.config)
+        logs = {"data": {"result": []}}
+        if args.collect_logs:
+            logs = _call_json(args.profile, "aichat.queryChatLogs", logs_request_path, config=args.config)
         _write_json(rounds_path, rounds)
-        _write_json(logs_path, logs)
+        if args.collect_logs:
+            _write_json(logs_path, logs)
 
+    round_items = ((rounds.get("data") or {}).get("result")) or []
+    current_rounds = [
+        item for item in round_items if isinstance(item, dict)
+        and message_id in {item.get("id"), item.get("queryId"), item.get("messageId")}
+    ]
+    if not args.conv_id and not current_rounds and len(round_items) == 1 and isinstance(round_items[0], dict):
+        current_rounds = round_items
+    current_states = [str(item.get("status") or "").upper() for item in current_rounds]
+    execution_failed = any(state in {"ERROR", "FAILED", "INTERRUPTED"} for state in current_states)
+    execution_complete = bool(current_states) and all(state == "NORMAL" for state in current_states)
     summary = {
-        "ok": stream_result.returncode == 0,
-        "ok_scope": "transport_only",
-        "business_result": "requires_answer_and_tool_result_review",
+        "ok": stream_result.returncode == 0 and execution_complete,
+        "ok_scope": "transport_and_current_round_status_only",
+        "transport_ok": stream_result.returncode == 0,
+        "current_round_states": current_states,
+        "business_result": "failed" if execution_failed else (
+            "requires_answer_and_tool_result_review" if execution_complete else "pending_or_unknown"
+        ),
+        "logs_collected": args.collect_logs,
         "convId": conv_id,
         "rpcId": rpc_id,
         "messageId": message_id,
@@ -236,14 +269,16 @@ def command_run(args: argparse.Namespace) -> int:
         **_logs_summary(logs),
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
-    return 0 if stream_result.returncode == 0 else 1
+    if stream_result.returncode != 0 or execution_failed:
+        return 1
+    return 0 if execution_complete else 2
 
 
 def command_rounds(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="smartbi-baize-") as temp_name:
         request_path = Path(temp_name) / "rounds.json"
         _write_json(request_path, {"convId": args.conv_id})
-        payload = _call_json(args.profile, "aichat.getConversationRounds", request_path)
+        payload = _call_json(args.profile, "aichat.getConversationRounds", request_path, config=args.config)
     if args.output:
         _write_json(args.output, payload)
     print(json.dumps(_round_summary(payload), ensure_ascii=False, indent=2))
@@ -254,7 +289,7 @@ def command_logs(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="smartbi-baize-") as temp_name:
         request_path = Path(temp_name) / "logs.json"
         _write_json(request_path, {"query": {"skip": 0, "limit": args.limit, "convId": args.conv_id}})
-        payload = _call_json(args.profile, "aichat.queryChatLogs", request_path)
+        payload = _call_json(args.profile, "aichat.queryChatLogs", request_path, config=args.config)
     if args.query_id:
         result = (((payload.get("data") or {}).get("result")) or [])
         payload["data"]["result"] = [
@@ -287,6 +322,7 @@ def command_resume(args: argparse.Namespace) -> int:
                 "--agent",
             ],
             stdout_path=args.output,
+            config=args.config,
         )
     if result.stderr:
         print(result.stderr, file=sys.stderr, end="")
@@ -297,16 +333,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="action", required=True)
 
-    run = subparsers.add_parser("run", help="create a conversation, run one question, and collect evidence")
+    run = subparsers.add_parser("run", help="创建会话、执行一次问数并收集结果证据")
     run.add_argument("--profile", required=True)
     run.add_argument(
         "--agent-id",
         default="customagent_AGENT_DATA_INSIGHT_ASSISTANT",
-        help="Agent ID (default: customagent_AGENT_DATA_INSIGHT_ASSISTANT, the Baize data-insight Agent)",
+        help="智能体 ID（默认使用白泽数据洞察智能体）",
     )
     run.add_argument("--dataset-id", required=True)
     run.add_argument("--dataset-name", required=True)
-    run.add_argument("--dataset-type", required=True, help="Actual resource type verified against target metadata and queryRpc schema")
+    run.add_argument("--dataset-type", required=True, help="按目标元数据和 queryRpc 契约核实的真实资源类型")
     run.add_argument("--question", required=True)
     run.add_argument("--conv-id")
     run.add_argument("--llm-config-id")
@@ -318,41 +354,42 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     run.add_argument("--timeout-ms", type=int, default=900000)
     run.add_argument("--max-events", type=int, default=2000)
     run.add_argument("--log-limit", type=int, default=500)
+    run.add_argument("--collect-logs", action="store_true", help="按需保存会话日志；默认仅回读轮次")
     run.add_argument("--out-dir", type=Path, required=True)
     run.add_argument(
         "--download-artifacts",
         action="store_true",
-        help="download file artifacts advertised by the completed SSE stream",
+        help="下载已完成 SSE 流中的文件交付物",
     )
     run.add_argument(
         "--artifact-dir",
         type=Path,
-        help="local directory for downloaded artifacts (default: <out-dir>/artifacts)",
+        help="文件下载目录（默认 <out-dir>/artifacts）",
     )
     run.add_argument(
         "--artifact-operation",
         default="aichat.downloadQueryResult",
-        help="binary download operation (default: aichat.downloadQueryResult)",
+        help="二进制下载操作（默认 aichat.downloadQueryResult）",
     )
     run.add_argument(
         "--artifact-request-field",
         default="filePath",
-        help="download request field (use s3Uri for an S3 CGI operation)",
+        help="下载请求字段（S3 CGI 操作使用 s3Uri）",
     )
     run.add_argument(
         "--artifact-overwrite",
         action="store_true",
-        help="allow replacing an existing artifact destination",
+        help="允许覆盖已有交付文件",
     )
     run.set_defaults(func=command_run)
 
-    rounds = subparsers.add_parser("rounds", help="inspect conversation rounds")
+    rounds = subparsers.add_parser("rounds", help="检查会话轮次")
     rounds.add_argument("--profile", required=True)
     rounds.add_argument("--conv-id", required=True)
     rounds.add_argument("--output", type=Path)
     rounds.set_defaults(func=command_rounds)
 
-    logs = subparsers.add_parser("logs", help="inspect conversation chat logs")
+    logs = subparsers.add_parser("logs", help="检查会话聊天日志")
     logs.add_argument("--profile", required=True)
     logs.add_argument("--conv-id", required=True)
     logs.add_argument("--query-id")
@@ -360,13 +397,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     logs.add_argument("--output", type=Path)
     logs.set_defaults(func=command_logs)
 
-    resume = subparsers.add_parser("resume", help="resume an interrupted SSE conversation")
+    resume = subparsers.add_parser("resume", help="继续已中断的 SSE 会话")
     resume.add_argument("--profile", required=True)
     resume.add_argument("--conv-id", required=True)
     resume.add_argument("--timeout-ms", type=int, default=900000)
     resume.add_argument("--max-events", type=int, default=2000)
     resume.add_argument("--output", type=Path, required=True)
     resume.set_defaults(func=command_resume)
+    for action in (run, rounds, logs, resume):
+        action.add_argument("--config", type=Path, help="已指定的 SmartBI CLI 配置文件路径")
     return parser.parse_args(argv)
 
 

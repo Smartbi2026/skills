@@ -11,7 +11,7 @@ function usage(exitCode) {
     "",
     "参数:",
     "  script.js   Rhino JS 脚本文件路径（原始多行 JS）",
-    "  meta.json   请求体元数据模板（含 selfDefineTaskUpsertRequest 且 script 为空占位）",
+    "  meta.json   完整请求体模板（按接口契约提供外层对象和 script 字符串占位）",
     "  output.json 输出文件路径（合并后的完整请求体 JSON）",
     "",
     "示例:",
@@ -31,7 +31,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 }
 
 const args = process.argv.slice(2);
-if (args.length < 3) {
+if (args.length !== 3) {
   console.error("ERROR: 需要 3 个参数，实际收到 " + args.length + " 个");
   usage(1);
 }
@@ -59,29 +59,25 @@ try {
   errorExit("元数据模板 JSON 解析失败: " + e.message);
 }
 
-let reqKey;
-if (metaJson.selfDefineTaskUpsertRequest) {
-  reqKey = "selfDefineTaskUpsertRequest";
-} else if (metaJson.customTaskUpsertRequest) {
-  reqKey = "customTaskUpsertRequest";
-} else {
-  const topKeys = Object.keys(metaJson);
-  if (topKeys.length === 1 && typeof metaJson[topKeys[0]] === "object") {
-    reqKey = topKeys[0];
-  } else {
-    metaJson = { selfDefineTaskUpsertRequest: metaJson };
-    reqKey = "selfDefineTaskUpsertRequest";
-  }
+if (!metaJson || typeof metaJson !== "object" || Array.isArray(metaJson)) {
+  errorExit("元数据模板必须是完整请求体 JSON 对象");
 }
+const topKeys = Object.keys(metaJson);
+if (topKeys.length !== 1) {
+  errorExit("请按接口契约提供唯一的请求外层对象；工具不自动补充或猜测包装");
+}
+const reqKey = topKeys[0];
 
 const req = metaJson[reqKey];
-if (!req || typeof req !== "object") {
+if (!req || typeof req !== "object" || Array.isArray(req)) {
   errorExit("元数据模板中未找到有效的请求对象（key: " + reqKey + "）");
 }
 
-if (!req.name) errorExit("元数据模板缺少必填字段: name");
-if (!req.script && req.script !== "") {
-  req.script = "";
+if (typeof req.name !== "string" || !req.name.trim()) {
+  errorExit("元数据模板必须提供非空 name 字符串");
+}
+if (typeof req.script !== "string") {
+  errorExit("请求对象必须提供 script 字符串占位；工具只注入脚本，不补充其他参数");
 }
 
 req.script = scriptContent;

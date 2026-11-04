@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Safely inspect or mutate SmartBI Baize Agent workflows and tool providers.
+"""管理 SmartBI 智能体工作流和工具 Provider。
 
-These endpoints are internal SmartBI contracts, not stable public SDK APIs.
-Authentication headers are read only from environment variables. Agent update
-uses a two-phase SHA-256 precondition and always writes a local backup first.
+内部接口仅在标准 SDK 缺少所需能力且当前契约已核实时使用。
+认证头从环境变量读取；修改默认预览，提交须校验哈希、备份并回读。
 """
 
 from __future__ import annotations
@@ -11,8 +10,10 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import gzip
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -28,7 +29,7 @@ AGENT_EDITABLE_FIELDS = ("name", "alias", "desc", "define", "setting")
 def redact(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            key: "[REDACTED]" if key.lower() in SENSITIVE_KEYS else redact(item)
+            key: "[已隐藏]" if key.lower() in SENSITIVE_KEYS else redact(item)
             for key, item in value.items()
         }
     if isinstance(value, list):
@@ -45,15 +46,15 @@ def headers_from_environment(items: list[str]) -> dict[str, str]:
     headers = {"Accept": "application/json"}
     for item in items:
         if "=" not in item:
-            raise ValueError("--header-env must be HTTP_HEADER=ENV_VAR")
+            raise ValueError("--header-env 必须为 HTTP_HEADER=ENV_VAR")
         header, environment_name = item.split("=", 1)
         if not header or not environment_name or any(c in header for c in "\r\n"):
-            raise ValueError("invalid header or environment variable name")
+            raise ValueError("请求头或环境变量名无效")
         value = os.environ.get(environment_name)
         if value is None:
-            raise ValueError(f"environment variable {environment_name!r} is not set")
+            raise ValueError(f"环境变量 {environment_name!r} 未设置")
         if any(c in value for c in "\r\n"):
-            raise ValueError(f"environment variable {environment_name!r} contains a newline")
+            raise ValueError(f"环境变量 {environment_name!r} 含换行符")
         headers[header] = value
     return headers
 
@@ -61,9 +62,12 @@ def headers_from_environment(items: list[str]) -> dict[str, str]:
 class Client:
     def __init__(self, base_url: str, header_env: list[str], timeout: float):
         base = base_url.rstrip("/")
-        if base.endswith("/smartbi"):
-            base = base[: -len("/smartbi")]
-        self.prefix = base + "/smartbi/smartbix/api/dataagent"
+        parsed = urllib.parse.urlsplit(base)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment or parsed.username:
+            raise ValueError("请提供不含凭证、查询参数和片段的 SmartBI 根地址")
+        if not parsed.path or parsed.path == "/":
+            base += "/smartbi"
+        self.prefix = base + "/smartbix/api/dataagent"
         self.headers = headers_from_environment(header_env)
         self.timeout = timeout
 
@@ -80,11 +84,24 @@ class Client:
                 data = bytes(body)
         request = urllib.request.Request(self.prefix + path, data=data, headers=headers, method=method)
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            raw = response.read().decode("utf-8", errors="replace")
+            content = response.read()
+            encoding = (getattr(response, "headers", {}) or {}).get("Content-Encoding", "").lower()
+            if encoding == "gzip":
+                content = gzip.decompress(content)
+            raw = content.decode("utf-8", errors="replace")
             try:
                 payload = json.loads(raw)
-            except json.JSONDecodeError:
-                payload = raw
+            except json.JSONDecodeError as exc:
+                # 部分部署的创建接口返回未加 JSON 引号的资源 ID。
+                value = raw.strip()
+                if (path.startswith("/graph/create/") or path == "/tools/create") and re.fullmatch(r"I[0-9a-fA-F]{16,}", value):
+                    return value
+                raise RuntimeError("内部接口未返回 JSON，需核实地址、认证与当前契约") from exc
+        if isinstance(payload, dict):
+            if payload.get("success") is False or payload.get("ok") is False:
+                raise RuntimeError("内部接口返回业务失败；保留服务端诊断信息，不按 HTTP 成功判断完成")
+            if "result" in payload and "code" in payload and str(payload["code"]) != "0":
+                raise RuntimeError("内部接口返回非成功业务码，请核实当前契约和服务端错误")
         if isinstance(payload, dict) and str(payload.get("code")) == "0" and "result" in payload:
             return payload["result"]
         return payload
@@ -101,10 +118,19 @@ def write_json(path: Path, value: Any) -> None:
 
 def normalize_agent(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
-        raise ValueError("agent response must be an object")
+        raise ValueError("智能体响应必须是对象")
+    if not raw.get("id") and not raw.get("name") and "define" not in raw:
+        raise ValueError("响应不含有效智能体定义")
     if isinstance(raw.get("define"), (dict, list)):
         raw = dict(raw)
         raw["define"] = json.dumps(raw["define"], ensure_ascii=False, separators=(",", ":"))
+    if "define" in raw:
+        try:
+            graph = json.loads(raw["define"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("智能体 define 必须是有效 JSON 对象") from exc
+        if not isinstance(graph, dict):
+            raise ValueError("智能体 define 必须是 JSON 对象")
     return raw
 
 
@@ -147,9 +173,13 @@ def command_agent_get(args: argparse.Namespace, client: Client) -> int:
 def command_agent_update(args: argparse.Namespace, client: Client) -> int:
     live = get_agent(client, args.agent_id)
     current_hash = agent_digest(live)
-    patch = normalize_agent(load_json(args.file))
+    patch = load_json(args.file)
+    if not isinstance(patch, dict):
+        raise ValueError("更新补丁必须是对象")
+    if "define" in patch:
+        patch = normalize_agent(patch)
     if patch.get("id") not in (None, args.agent_id):
-        raise ValueError("payload id does not match --agent-id")
+        raise ValueError("请求id与--agent-id不一致")
 
     candidate = dict(live)
     changed_fields: list[str] = []
@@ -174,22 +204,23 @@ def command_agent_update(args: argparse.Namespace, client: Client) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     if not args.expect_sha256:
-        raise ValueError("--apply requires --expect-sha256 from a prior dry-run")
+        raise ValueError("--apply 需要此前预览返回的 --expect-sha256")
     if args.expect_sha256 != current_hash:
-        raise ValueError("live agent changed after dry-run; export again instead of overwriting")
+        raise ValueError("智能体在预览后已变化，请重新读取，不能覆盖")
     if not changed_fields:
-        raise ValueError("candidate has no editable changes")
+        raise ValueError("没有可提交的字段变更")
 
-    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = args.backup_dir / f"agent-{args.agent_id}-before-{stamp}.json"
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    safe_id = urllib.parse.quote(args.agent_id, safe="")
+    backup = args.backup_dir / f"agent-{safe_id}-before-{stamp}.json"
     write_json(backup, redact(live))
     update_result = client.request("POST", "/graph/update", candidate)
     if update_result is not True:
-        raise RuntimeError(f"agent update returned {update_result!r}")
+        raise RuntimeError("智能体更新返回异常，未确认更新成功")
     verified = get_agent(client, args.agent_id)
     for key in AGENT_EDITABLE_FIELDS:
         if verified.get(key) != candidate.get(key):
-            raise RuntimeError(f"read-back mismatch in field {key!r}")
+            raise RuntimeError(f"回读字段不一致 {key!r}")
     result.update({"backup": str(backup), "verified": graph_summary(verified)})
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
@@ -199,7 +230,7 @@ def command_agent_create(args: argparse.Namespace, client: Client) -> int:
     payload = normalize_agent(load_json(args.file))
     missing = [key for key in ("name", "alias", "define") if not payload.get(key)]
     if missing:
-        raise ValueError(f"agent payload missing required fields: {', '.join(missing)}")
+        raise ValueError(f"智能体请求缺少必填字段: {', '.join(missing)}")
     preview = {"mode": "apply" if args.apply else "dry-run", "parent_id": args.parent_id, **graph_summary(payload)}
     if not args.apply:
         print(json.dumps({"ok": True, **preview}, ensure_ascii=False, indent=2))
@@ -207,8 +238,11 @@ def command_agent_create(args: argparse.Namespace, client: Client) -> int:
     parent = urllib.parse.quote(args.parent_id, safe="")
     created_id = client.request("POST", f"/graph/create/{parent}", payload)
     if not isinstance(created_id, str) or not created_id:
-        raise RuntimeError(f"agent create returned {created_id!r}")
+        raise RuntimeError("智能体创建未返回有效资源 ID")
     verified = get_agent(client, created_id)
+    for key in AGENT_EDITABLE_FIELDS:
+        if key in payload and verified.get(key) != payload[key]:
+            raise RuntimeError(f"创建后的回读字段不一致：{key}")
     print(json.dumps({"ok": True, **preview, "created_id": created_id, "verified": graph_summary(verified)}, ensure_ascii=False, indent=2))
     return 0
 
@@ -252,7 +286,7 @@ def command_provider_parse(args: argparse.Namespace, client: Client) -> int:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", required=True, help="for example http://smartbi.example:9070")
+    parser.add_argument("--base-url", required=True, help="已确认的 SmartBI 根地址，例如 https://smartbi.example/smartbi")
     parser.add_argument("--header-env", action="append", default=[], metavar="HTTP_HEADER=ENV_VAR")
     parser.add_argument("--timeout", type=float, default=30.0)
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -297,6 +331,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         client = Client(args.base_url, args.header_env, args.timeout)
         return int(args.func(args, client))
+    except urllib.error.HTTPError as exc:
+        print(json.dumps({"ok": False, "error": "内部接口 HTTP 调用失败", "status": exc.code}, ensure_ascii=False), file=sys.stderr)
+        return 1
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError, urllib.error.URLError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
